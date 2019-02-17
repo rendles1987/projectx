@@ -1,6 +1,5 @@
 FROM ubuntu:18.04
 
-
 RUN apt-get -y update \
     && apt-get -y install --no-install-recommends \
         python3-dev \
@@ -19,3 +18,6 @@ WORKDIR /work
 RUN pip install -r requirements.txt -U
 COPY . /work
 # continue as before...
+
+# VOLUME /home/renierkramer/test123/:/work/data
+VOLUME ~/test123/:/work/data
