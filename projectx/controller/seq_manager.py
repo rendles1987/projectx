@@ -78,3 +78,12 @@ class ProcessController:
         self.do_raw_data()
         self.do_enrich()
         self.do_ml()
+
+        # projectx/raw_data/ is added to .gitignore
+        raw_data_dir = '/raw_data/'
+        fname = raw_data_dir + 'abc.txt'
+
+        with open(fname) as f:
+            content = f.readlines()
+        content = [x.strip() for x in content]
+        print(content)
