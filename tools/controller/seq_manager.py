@@ -1,4 +1,6 @@
-from projectx.scrape.league import NedLeague
+from tools.scrape.league import NedLeague
+import pandas as pd
+import os
 
 
 class ProcessController:
@@ -29,7 +31,32 @@ class ProcessController:
         print(NedLeague.scraper_type)
 
     def start_collect(self):
-        pass
+        # projectx/raw_data/ is added to .gitignore
+
+        import os
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        raw_data_dir = '/opt/project/raw_data/'
+
+        cup_dir = raw_data_dir + 'cup/'
+        league_dir = raw_data_dir + 'league/'
+        player_dir = raw_data_dir + 'player/'
+
+        this_dir = cup_dir
+        csv_paths = [os.path.join(cup_dir, file) for file in os.listdir(
+            this_dir) if file.endswith(".csv")]
+
+        for csv_path in csv_paths:
+            data = pd.read_csv(csv_path)
+            # Preview the first 5 lines of the loaded data
+            data.head()
+
+
+        # with open(fname) as f:
+        #     content = f.readlines()
+        # content = [x.strip() for x in content]
+        # print(content)
+
+
 
     def start_check_collect(self):
         pass
@@ -79,11 +106,3 @@ class ProcessController:
         self.do_enrich()
         self.do_ml()
 
-        # projectx/raw_data/ is added to .gitignore
-        raw_data_dir = '/raw_data/'
-        fname = raw_data_dir + 'abc.txt'
-
-        with open(fname) as f:
-            content = f.readlines()
-        content = [x.strip() for x in content]
-        print(content)
