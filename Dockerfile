@@ -1,6 +1,5 @@
 FROM ubuntu:18.04
 
-
 RUN apt-get -y update \
     && apt-get -y install --no-install-recommends \
         python3-dev \
@@ -13,9 +12,7 @@ RUN apt-get -y update \
 RUN pip3 install --upgrade pip
 RUN pip3 install setuptools
 
-# https://stackoverflow.com/questions/34398632/docker-how-to-run-pip-requirements-txt-only-if-there-was-a-change
 COPY requirements.txt /work/requirements.txt
 WORKDIR /work
-RUN pip install -r requirements.txt -U
-COPY . /work
-# continue as before...
+RUN pip install -r requirements.txt
+CMD python3 /work/main.py

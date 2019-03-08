@@ -1,1 +1,7 @@
-**
+# define here what must be ignored during the image build
+# ** ignores everything <--
+# **/Dockerfile ignore all Dockerfile in directory
+
+.gitignore
+.git/
+.idea/

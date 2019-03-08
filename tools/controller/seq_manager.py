@@ -1,4 +1,6 @@
-from projectx.scrape.league import NedLeague
+from tools.scrape.league import NedLeague
+import pandas as pd
+import os
 
 
 class ProcessController:
@@ -29,7 +31,37 @@ class ProcessController:
         print(NedLeague.scraper_type)
 
     def start_collect(self):
-        pass
+        # dir_path = os.path.dirname(os.path.realpath(__file__))
+        # raw_data_dir = '/opt/project/raw_data/'
+        raw_data_dir = '/work/raw_data/'
+
+        cup_dir = raw_data_dir + 'cup/'
+        # league_dir = raw_data_dir + 'league/'
+        # player_dir = raw_data_dir + 'player/'
+
+        this_dir = cup_dir
+        csv_paths = [os.path.join(cup_dir, file) for file in os.listdir(
+            this_dir) if file.endswith(".csv")]
+
+
+        for csv_path in csv_paths:
+
+            if not os.path.exists(csv_path):
+                raise AssertionError('csv does not exists')
+            data = pd.read_csv(csv_path, sep='\t')
+            # Preview the first 5 lines of the loaded data
+            print(data.head())
+            print('hoi')
+
+
+
+
+        # with open(fname) as f:
+        #     content = f.readlines()
+        # content = [x.strip() for x in content]
+        # print(content)
+
+
 
     def start_check_collect(self):
         pass
@@ -78,3 +110,4 @@ class ProcessController:
         self.do_raw_data()
         self.do_enrich()
         self.do_ml()
+

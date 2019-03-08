@@ -35,7 +35,6 @@ htmlcov
 .mr.developer.cfg
 src
 
-
 # Ignore generated config files
 etc/*.nginx.conf
 etc/*.logrotate
@@ -43,4 +42,4 @@ etc/*.logrotate
 # Ignore ide's
 .idea/
 raw_data/
-
+docker-compose.override.yml

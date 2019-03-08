@@ -1,0 +1,12 @@
+version: '3.0'
+
+services:
+  projectx:
+    image: projectx:latest
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    volumes:
+      - .:/work # source code
+      - /home/renierkramer/Documents/werk/qgis_plugin/pycharm_debug_eggs_2018_3_4/debug_eggs:/pycharm-helpers # eggs needed for debugging
+    command: python3 main.py
