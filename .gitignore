@@ -43,3 +43,5 @@ etc/*.logrotate
 .idea/
 raw_data/
 docker-compose.override.yml
+remote_debug.py
+.dockerignore
