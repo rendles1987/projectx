@@ -31,24 +31,29 @@ class ProcessController:
         print(NedLeague.scraper_type)
 
     def start_collect(self):
-        # projectx/raw_data/ is added to .gitignore
-
-        import os
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        raw_data_dir = '/opt/project/raw_data/'
+        # dir_path = os.path.dirname(os.path.realpath(__file__))
+        # raw_data_dir = '/opt/project/raw_data/'
+        raw_data_dir = '/work/raw_data/'
 
         cup_dir = raw_data_dir + 'cup/'
-        league_dir = raw_data_dir + 'league/'
-        player_dir = raw_data_dir + 'player/'
+        # league_dir = raw_data_dir + 'league/'
+        # player_dir = raw_data_dir + 'player/'
 
         this_dir = cup_dir
         csv_paths = [os.path.join(cup_dir, file) for file in os.listdir(
             this_dir) if file.endswith(".csv")]
 
+
         for csv_path in csv_paths:
-            data = pd.read_csv(csv_path)
+
+            if not os.path.exists(csv_path):
+                raise AssertionError('csv does not exists')
+            data = pd.read_csv(csv_path, sep='\t')
             # Preview the first 5 lines of the loaded data
-            data.head()
+            print(data.head())
+            print('hoi')
+
+
 
 
         # with open(fname) as f:
