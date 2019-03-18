@@ -16,5 +16,8 @@ def do_remote_debug():
     import pydevd
     # pydevd.settrace('10.90.20.40', port=4444, stdoutToServer=True,
     #             stderrToServer=True, suspend=True)
-    pydevd.settrace('10.90.20.40', port=4444, suspend=False,
+    # pydevd.settrace('10.90.20.43', port=4444, suspend=False,
+    #                 stdoutToServer=True)
+    pydevd.settrace('192.168.1.97', port=4444, suspend=False,
                     stdoutToServer=True)
+
