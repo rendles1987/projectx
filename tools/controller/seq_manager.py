@@ -49,10 +49,12 @@ class ProcessController:
         for csv_type, csv_file_path in self.raw_csv_info.csv_info:
             if csv_type == 'league':
                 data_adapter = LeagueCsvAdapter(csv_file_path)
+                data_adapter.convert_to_desired_dtype()
             else:
                 pass
-            data_adapter.convert()
-            data_adapter.save()
+            #
+            # data_adapter.convert()
+            # data_adapter.save()
 
             #     for data_property in data_adapter._meta:
             #         print('name: ', data_property.name,

@@ -1,8 +1,8 @@
 from collections import namedtuple
-from tools.constants import COUNTRY_WHITE_LIST, BASE_GAME_PROPERTIES, LEAGUE_GAME_PROPERTIES
+from tools.constants import COUNTRY_WHITE_LIST, BASE_GAME_PROPERTIES, LEAGUE_GAME_PROPERTIES, CUP_GAME_PROPERTIES
 import pandas as pd
 import os
-
+import datetime
 
 
 class RawCsvInfo:
@@ -53,8 +53,9 @@ class GameBaseCsvAdapter:
         self._country = None
         self._dataframe = None
         self._dataframe_copy = None
-        self._date = None
-        self._meta = BASE_GAME_PROPERTIES
+        self._home = None
+        self._away = None
+        self.properties = BASE_GAME_PROPERTIES
 
     @property
     def csv_file_name(self):
@@ -97,41 +98,144 @@ class GameBaseCsvAdapter:
             'country', self.country, 'not in ', COUNTRY_WHITE_LIST)
 
     @property
-    def date(self):
-        if self._date:
-            return self._date
-        self._date = self.dataframe ['date']
-        return self._date
+    def home(self):
+        if self._home:
+            return self._home
+        self._home = self.dataframe ['home']
+        return self._home
 
-    def check_date(self):
+    def check_home(self):
+        function_name = self.__name__
+        base_name = self.remove_check_prefix(function_name)  # e.g. base_name = 'home'
+        assert self.check_dtype(base_name)
+
+    @property
+    def away(self):
+        if self._away:
+            return self._away
+        self._away = self.dataframe ['away']
+        return self._away
+
+    def check_home(self):
+        function_name = self.__name__
+        base_name = self.remove_check_prefix(function_name)  # e.g. base_name = 'away'
+        if not self.check_dtype(base_name):
+            self.dataframe_copy[base_name] = self.dataframe_copy
+
+    def convert_to_desired_dtype(self):
         pass
-
-    def convert(self):
-
+        # convert column "a" to int64 dtype and "b" to complex type
+        # df = df.astype({"a": int, "b": complex})
         print('hoi')
 
+    def get_prop_info(self, prop):
+        prop_list = [tupl for tupl in self.properties if tupl.name == prop]
+        assert len(prop_list) == 1
+        prop_name_tupl = prop_list[0]
+        return prop_name_tupl
 
-        self.check_country()
-        self.check_country()
+    def remove_check_prefix(self, function_name):
+        prefix = 'check_'
+        assert function_name.startswith(prefix)
+        return function_name[len(prefix):]
 
-        csv_file_name = self.csv_file_name
-        dataframe = self.dataframe
-        dataframe_copy = self.dataframe_copy
-
-
-
-        assert self.csv_file_name is not None
-        assert self.dataframe is not None
-        assert self.dataframe_copy is not None
+    def check_dtype(self, base_name):
+        desired_dtype = self.get_prop_info(base_name).desired_dtype
+        raw_data_dtype = getattr(self, base_name).dtype()  # get datatype from dataframe
+        return desired_dtype == raw_data_dtype
 
 
-    def check_date(self):
-        # check dtype
-        type = self.dataframe['data'].dtype
-        assert type == self.date.csv_type
 
-        # make sure it is dd/mm/yyyy
-        date_format = 12
+
+
+
+
+
+
+
+
+        dtype_list = [k.desired_type for k in self._meta if k.name == 'date']
+        assert len(dtype_list) == 1
+        desired_dtype = dtype_list[0]
+        if not self.date.dtype() == desired_dtype:
+            raise Exception('date type must be converted')
+
+    @property
+    def home(self):
+        if self._home:
+            return self._home
+        self._home = self.dataframe ['home']
+        return self._home
+
+    # def get_slashes_date(self, s_date):
+    #
+    #     s_date = str(s_date)
+    #     # Sept. is not recognized by datetime
+    #     s_date = s_date.replace('Sept.', 'Sep.')
+    #
+    #     date_patterns = ['%B %d, %Y',  # <-- with comma
+    #                      '%b. %d, %Y',  # <-- with comma
+    #                      '%B %d %Y',
+    #                      '%b. %d %Y', ]
+    #
+    #     # %b = maand afkorting (zonder punt!)   # Jan, Feb, …, Dec (Sept bestaat niet!!)
+    #     # %B = maand uitgeschreven              # January, February, …, December
+    #     # %d = zero-padded decimal number
+    #     # %Y = year 4 digits
+    #     for pattern in date_patterns:
+    #         try:
+    #             dd_mm_yyyy = datetime.strptime(s_date, pattern).date()
+    #             date_slashes = dd_mm_yyyy.strftime("%d/%m/%Y")  # '24/06/1987'
+    #             return date_slashes
+    #         except Exception as e:
+    #             pass
+    #     raise AssertionError('Date %s is not in expected format' % s_date)
+
+
+
+
+
+    # def check_date(self):
+    #     # check dtype
+    #     type = self.dataframe['date'].dtype
+    #     assert type == self.date.csv_type
+    #
+    #     # make sure it is dd/mm/yyyy
+    #     date_format = 12
+    #
+
+    def convert_date(self):
+        pass
+
+    # def convert(self):
+    #            self.convert_date()
+    #
+    #     for data_property in self._meta:
+    #         if data_property.name in
+        #     for data_property in data_adapter._meta:
+        #         print('name: ', data_property.name,
+        #               'desired_type: ', data_property.desired_type,
+
+
+
+        # print('hoi')
+        #
+        #
+        # self.check_country()
+        # self.check_country()
+        #
+        # csv_file_name = self.csv_file_name
+        # dataframe = self.dataframe
+        # dataframe_copy = self.dataframe_copy
+        #
+        #
+        #
+        # assert self.csv_file_name is not None
+        # assert self.dataframe is not None
+        # assert self.dataframe_copy is not None
+
+
+
 
 
     def save_csv(self):
@@ -160,9 +264,10 @@ class GameBaseCsvAdapter:
 
 
 class CupCsvAdapter(GameBaseCsvAdapter):
-    def __init__(self, csvfilepath, gametype='cup'):
+    def __init__(self, csvfilepath):
         GameBaseCsvAdapter.__init__(self, csvfilepath)
-        self.game_type = gametype
+        self.game_type = 'cup'
+        self.properties = CUP_GAME_PROPERTIES
 
     def save_csv(self):
         pass
@@ -171,9 +276,10 @@ class CupCsvAdapter(GameBaseCsvAdapter):
 
 
 class LeagueCsvAdapter(GameBaseCsvAdapter):
-    def __init__(self, csvfilepath, gametype='league'):
+    def __init__(self, csvfilepath):
         GameBaseCsvAdapter.__init__(self, csvfilepath)
-        self.game_type = gametype
+        self.game_type = 'league'
+        self.properties = LEAGUE_GAME_PROPERTIES
 
     def save_csv(self):
         pass
