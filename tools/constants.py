@@ -6,7 +6,14 @@ COUNTRY_WHITE_LIST = ["ger", "eng", "por", "esp", "fra", "ita", "ned"]
 # csv variable information
 csv_propinfo = namedtuple(
     "csv_propinfo",
-    ["name", "is_column_name", "source", "is_not_null", "desired_type", "descr"],
+    [
+        "name",
+        "is_column_name",
+        "source",
+        "is_not_null",
+        "desired_type",
+        "descr",
+    ],
 )
 
 # NOT COLUMN NAMES
@@ -22,23 +29,40 @@ CSV_FILE_NAME = csv_propinfo(
 COUNTRY = csv_propinfo(
     "country", False, "filename", True, "string", '3 chars abbrev e.g: "ger"'
 )
-GAME_NAME = csv_propinfo("game_name", False, "filename", True, "string", "e.g. knvb")
+GAME_NAME = csv_propinfo(
+    "game_name", False, "filename", True, "string", "e.g. knvb"
+)
 SEASON = csv_propinfo(
     "season", False, "filename", True, "int", '"2008/2009" will be int(2008)'
 )
-NOT_COLUMN_NAMES = [CSV_FILE_DIR, GAME_TYPE, CSV_FILE_NAME, COUNTRY, GAME_NAME, SEASON]
+NOT_COLUMN_NAMES = [
+    CSV_FILE_DIR,
+    GAME_TYPE,
+    CSV_FILE_NAME,
+    COUNTRY,
+    GAME_NAME,
+    SEASON,
+]
 
 # COLUMN NAMES
-DATE = csv_propinfo("date", True, "data", True, "date", "playdate format: dd/mm/yyyy")
-HOME = csv_propinfo("home", True, "data", True, "string", "name of home playing team")
-AWAY = csv_propinfo("away", True, "data", True, "string", "name of away playing team")
+DATE = csv_propinfo(
+    "date", True, "data", True, "date", "playdate format: dd/mm/yyyy"
+)
+HOME = csv_propinfo(
+    "home", True, "data", True, "string", "name of home playing team"
+)
+AWAY = csv_propinfo(
+    "away", True, "data", True, "string", "name of away playing team"
+)
 HOME_GOALS = csv_propinfo(
     "home_goals", True, "data", True, "int", "nr goals of home team incl aet"
 )
 AWAY_GOALS = csv_propinfo(
     "away_goals", True, "data", True, "int", "nr goals of away team incl aet"
 )
-URL = csv_propinfo("url", True, "data", True, "string", "full source path (hhtp url)")
+URL = csv_propinfo(
+    "url", True, "data", True, "string", "full source path (hhtp url)"
+)
 HOME_MANAGER = csv_propinfo(
     "home_manager", True, "data", True, "string", "managers name home team"
 )
