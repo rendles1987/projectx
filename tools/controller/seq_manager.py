@@ -2,7 +2,7 @@ from tools.scrape.league import NedLeague
 import pandas as pd
 import os
 from tools.adapt_raw_csv import RawCsvInfo
-from tools.adapt_raw_csv import LeagueCsvAdapter #, CupCsvAdapter, PlayerCsvAdapter
+from tools.adapt_raw_csv import GameBaseCsvAdapter, LeagueCsvAdapter #, CupCsvAdapter, PlayerCsvAdapter
 
 
 
@@ -48,11 +48,10 @@ class ProcessController:
         """
         for csv_type, csv_file_path in self.raw_csv_info.csv_info:
             if csv_type == 'league':
-                data_adapter = LeagueCsvAdapter(csv_file_path)
-                data_adapter.convert_to_desired_dtype()
-            else:
-                pass
-            #
+                # aaa = GameBaseCsvAdapter(csv_file_path)
+                league_adapter = LeagueCsvAdapter(csv_file_path)
+                league_adapter.run()
+
             # data_adapter.convert()
             # data_adapter.save()
 
