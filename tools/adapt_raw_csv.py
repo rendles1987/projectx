@@ -291,10 +291,13 @@ class GameBaseCsvAdapter:
             if prop.is_column_name
         }
         # {'date': 'date', 'home': 'string', 'home_goals': 'int', ......}
-        map_type_to_panda_type = {type.name: type.panda_type for type in DTYPES}
+        map_type_to_panda_type = {
+            type.name: type.panda_type for type in DTYPES
+        }
         # {'string': 'object', 'int': 'int64', 'date': 'datetime64', ....}
         convert_dct = {
-            k: map_type_to_panda_type[v] for k, v in map_column_to_desired_type.items()
+            k: map_type_to_panda_type[v]
+            for k, v in map_column_to_desired_type.items()
         }
         # {'date': 'datetime64', 'home': 'object', 'home_goals': 'int64', ...}
 
@@ -364,7 +367,9 @@ class GameBaseCsvAdapter:
 
     def check_dtype(self, base_name):
         desired_dtype = self.get_prop_info(base_name).desired_dtype
-        raw_data_dtype = getattr(self, base_name).dtype()  # get datatype from dataframe
+        raw_data_dtype = getattr(
+            self, base_name
+        ).dtype()  # get datatype from dataframe
         return desired_dtype == raw_data_dtype
 
     @property
