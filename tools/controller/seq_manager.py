@@ -2,16 +2,16 @@ from tools.scrape.league import NedLeague
 import pandas as pd
 import os
 from tools.adapt_raw_csv import RawCsvInfo
-from tools.adapt_raw_csv import GameBaseCsvAdapter, LeagueCsvAdapter #, CupCsvAdapter, PlayerCsvAdapter
-
+from tools.adapt_raw_csv import (
+    GameBaseCsvAdapter,
+    LeagueCsvAdapter,
+)  # , CupCsvAdapter, PlayerCsvAdapter
 
 
 class ProcessController:
     def __init__(self):
         self.raw_csvs = None
         self.raw_csv_info = RawCsvInfo()
-
-
 
         """
         ---------------------------------------------------
@@ -47,7 +47,7 @@ class ProcessController:
         3. convert raw csv into desired format
         """
         for csv_type, csv_file_path in self.raw_csv_info.csv_info:
-            if csv_type == 'league':
+            if csv_type == "league":
                 # aaa = GameBaseCsvAdapter(csv_file_path)
                 league_adapter = LeagueCsvAdapter(csv_file_path)
                 league_adapter.run()
@@ -71,11 +71,7 @@ class ProcessController:
             # else:
             #     raise Exception('unknown csv_type: ', csv_type)
 
-
-        print('hoi')
-
-
-
+        print("hoi")
 
         """
         #
@@ -151,16 +147,8 @@ class ProcessController:
         >>> data['home'].dtype == cup_checks.home_type
         True
         """
-        
-        
-        
-
-
-
-
 
         # check if
-
 
         # cup_column_dtype = [('index', 'int64'),
         #                     ('date', '<M8[ns]'),   # datetime64[ns]
@@ -218,9 +206,6 @@ class ProcessController:
         #     except:
         #         print('could not covert to date format')
 
-
-
-
         #
         # # check 1
         # check eck if home is str
@@ -229,14 +214,10 @@ class ProcessController:
         # if  in df.columns:
         #
 
-
-
         # with open(fname) as f:
         #     content = f.readlines()
         # content = [x.strip() for x in content]
         # print(content)
-
-
 
     def start_check_collect(self):
         pass
@@ -287,4 +268,3 @@ class ProcessController:
         self.do_raw_data()
         self.do_enrich()
         self.do_ml()
-

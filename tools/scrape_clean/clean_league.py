@@ -1,5 +1,3 @@
-
-
 def clean_league_data():
     pass
 

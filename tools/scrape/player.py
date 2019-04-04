@@ -1,9 +1,7 @@
-
-
 class PlayerScraper:
     def __init__(self, season):
         self.name = self.__str__()
-        self.scraper_type = 'player'
+        self.scraper_type = "player"
         self.season = season
 
     def scrape(self):
