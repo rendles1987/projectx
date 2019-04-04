@@ -71,7 +71,7 @@ class ProcessController:
             # else:
             #     raise Exception('unknown csv_type: ', csv_type)
 
-        print("hoi")
+        print("shutting down")
 
         """
         #

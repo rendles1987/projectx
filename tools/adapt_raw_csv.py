@@ -72,6 +72,10 @@ class GameBaseCsvAdapter:
         self.row_invalid_list = []
         self.properties = BASE_GAME_PROPERTIES
         # self._set_meta_attrs()
+        self.min_len_teamname = 2
+        self.max_len_teamname = 20
+
+        self.check_nametuple_constants()
 
     # def _set_meta_attrs(self):
     #     """ - Function is called in __init__ and adds metadata to this class.
@@ -108,14 +112,80 @@ class GameBaseCsvAdapter:
         except Exception as e:
             return False, str(e)
 
-    def add_row_to_invalid(self):
-        pass
+    def create_valid_and_invalid_df(self, invalid_dct):
+        # after all checks
+        df_copy = pd.read_csv(self.csv_file_path, sep="\t")
+
+        invalid_row_idx_list = list(invalid_dct.keys())
+        invalid_msg_list = list(invalid_dct.values())
+        assert len(invalid_row_idx_list) == len(invalid_msg_list)
+
+        # get inverse row index of dataframe
+        valid_row_idx_list = list(
+            set(df_copy.index.to_list()) - set(invalid_row_idx_list)
+        )
+
+        # update df_copy with msg for all invalid rows
+        df_copy["msg"] = pd.DataFrame(
+            {"msg": invalid_msg_list}, index=invalid_row_idx_list
+        )
+
+        # get valid and invalid df (combine these and you get the orig df)
+        valid_df = df_copy.iloc[valid_row_idx_list].astype(self.convert_dct)
+        invalid_df = df_copy.iloc[invalid_row_idx_list]
+        return valid_df, invalid_df
+
+    def check_nametuple_constants(self):
+        strip_these_fields = [
+            prop.name for prop in self.properties if prop.strip_whitespace
+        ]
+        string_fields = [
+            prop.name for prop in self.properties if prop.desired_type == "string"
+        ]
+        not_string_fields = [
+            prop.name for prop in self.properties if prop.desired_type != "string"
+        ]
+
+        # strip_these_fields must be in string_fields
+        for clm in strip_these_fields:
+            if clm not in string_fields:
+                raise AssertionError(clm + " not in string_columns")
+
+        # strip_these_fields can not be in not_string_fields
+        for clm in strip_these_fields:
+            if clm in not_string_fields:
+                raise AssertionError(clm + " can not be in not_string_columns")
+
+    def columns_strip_whitespace(self, df_copy):
+        strip_these_columns = [
+            prop.name
+            for prop in self.properties
+            if prop.strip_whitespace and prop.is_column_name
+        ]
+
+        for clm in strip_these_columns:
+            df_copy[clm] = df_copy[clm].str.strip()
+
+        return df_copy
 
     def do_row_by_row(self):
+        invalid_dct = {}
+        """
+        invalid_dct key     = int = row index of panda dataframe (0-based) 
+                            = int = row_idx below (also 0-based)
+        invalid_dct value   = string = explaining msg why row is invalid  
+        invalid_dct e.g. =  (   1, 'could not covert dtype column x',
+                                3, 'home_check_xxx failed',
+                            }
+        """
+        df_copy = pd.read_csv(self.csv_file_path, sep="\t")
+        df_copy = self.columns_strip_whitespace(df_copy)
 
-        for df_row in pd.read_csv(
-            self.csv_file_path, sep="\t", skiprows=0, chunksize=1
-        ):
+        for row_idx, df_row in df_copy.iterrows():
+
+            # for row_idx, df_row in enumerate(
+            #     pd.read_csv(self.csv_file_path, sep="\t", skiprows=0, chunksize=1)
+            # ):
 
             # 1. can be converted to desired datatype?
             # 2. check date
@@ -133,60 +203,83 @@ class GameBaseCsvAdapter:
             # 14. save invalid row as dict and append to self.row_invalid_list
             # 15. save valid row as dict and append to self.row_valid_list
 
-            # 1. can be converted to desired datatype?
+            # can be converted to desired datatype?
             try:
                 df_row_convert = df_row.astype(self.convert_dct)
             except Exception as e:
-                print(e)
-                # TODO: add this row to no_succes. save valid row as dict
-                #  and append to self.row_valid_list
+                msg = str(e)
+                msg.replace(",", "")
+                invalid_dct.update({row_idx: msg})
                 continue  # go to next df_row
 
-            # 2. check check date
+            # check_date
             okay, msg = self.check_date(df_row_convert)
-            if okay:
-                # go to next check
-                pass
             if not okay:
-                # TODO: add this row to no_succes. save valid row as dict
-                #  ADD msg to end of that dict
-                #  and append dict to self.row_invalid_list
+                invalid_dct.update({row_idx: msg})
                 continue  # go to next df_row
 
-            # 3. check home
-            okay, msg = self.check_home(df_row_convert)
-            if okay:
-                # go to next check
-                pass
+            # check_home_nr_chars
+            okay, msg = self.check_home_nr_chars(df_row_convert)
             if not okay:
-                # TODO: add this row to no_succes. save valid row as dict
-                #  and append to self.row_valid_list
+                invalid_dct.update({row_idx: msg})
                 continue  # go to next df_row
+
+            # check_away_nr_chars
+            okay, msg = self.check_away_nr_chars(df_row_convert)
+            if not okay:
+                invalid_dct.update({row_idx: msg})
+                continue  # go to next df_row
+
+            # check_score
+            okay, msg = self.check_score(df_row_convert)
+            if not okay:
+                invalid_dct.update({row_idx: msg})
+                continue  # go to next df_row
+
+        valid_df, invalid_df = self.create_valid_and_invalid_df(invalid_dct)
 
     def check_date(self, df_row_convert):
         # between 1999 and 2019
         min_date = "1999-12-31"
         max_date = "2019-12-31"
-        result = (df_row_convert["date"] > min_date).bool() & (
+        okay = (df_row_convert["date"] > min_date).bool() & (
             df_row_convert["date"] < max_date
         ).bool()
-        if result:
-            return True, ""
-        if not result:
-            msg = "date ", df_row_convert["date"], " not in logic range"
-            return False, msg
+        if okay:
+            return (True,)
+        msg = "date ", df_row_convert["date"], " not in logic range"
+        return False, msg
 
-    def check_home(self, df_row_convert):
-        min_len_home = 2
-        max_len_home = 20
-        result = (df_row_convert["home"].str.len() > min_len_home).bool() & (
-            df_row_convert["home"].str.len() < max_len_home
-        ).bool()
-        if result:
+    def check_home_nr_chars(self, df_row_convert):
+        column_name = "home"
+        okay = (
+            (df_row_convert[column_name].str.len() > self.min_len_teamname).bool()
+            & (df_row_convert[column_name].str.len() < self.max_len_teamname).bool()
+        )
+        if okay:
             return True, ""
-        if not result:
-            msg = "home ", df_row_convert["home"], " too little/much chars"
-            return False, msg
+        msg = "home too little/much chars:" + df_row_convert[column_name].values[0]
+        return False, msg
+
+    def check_away_nr_chars(self, df_row_convert):
+        column_name = "away"
+        okay = (
+            (df_row_convert[column_name].str.len() > self.min_len_teamname).bool()
+            & (df_row_convert[column_name].str.len() < self.max_len_teamname).bool()
+        )
+        if okay:
+            return True, ""
+        msg = "away too little/much chars:" + df_row_convert[column_name].values[0]
+        return False, msg
+
+    def check_score(self, df_row_convert):
+        """this field must contain 1 digit int, a colon (:), and 1 digit int"""
+        column_name = "score"
+        okay = True
+        if okay:
+            return True, ""
+        msg = "score weird format" + df_row_convert[column_name].values[0]
+        return False, msg
 
     @staticmethod
     def is_panda_df_empty(panda_df):

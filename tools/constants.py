@@ -6,12 +6,13 @@ COUNTRY_WHITE_LIST = ["ger", "eng", "por", "esp", "fra", "ita", "ned"]
 # csv variable information
 csv_propinfo = namedtuple(
     "csv_propinfo",
-    ["name", "is_column_name", "source", "is_not_null", "desired_type", "descr"],
+    ["name", "is_column_name", "source", "strip_whitespace", "desired_type", "descr"],
 )
+
 
 # NOT COLUMN NAMES
 CSV_FILE_DIR = csv_propinfo(
-    "csv_file_dir", False, "filedir", True, "", "absolute dir without filename"
+    "csv_file_dir", False, "filedir", True, "string", "absolute dir without filename"
 )
 GAME_TYPE = csv_propinfo(
     "game_type", False, "filename", True, "string", "cup of league"
@@ -24,21 +25,23 @@ COUNTRY = csv_propinfo(
 )
 GAME_NAME = csv_propinfo("game_name", False, "filename", True, "string", "e.g. knvb")
 SEASON = csv_propinfo(
-    "season", False, "filename", True, "int", '"2008/2009" will be int(2008)'
+    "season", False, "filename", False, "int", '"2008/2009" will be int(2008)'
 )
 NOT_COLUMN_NAMES = [CSV_FILE_DIR, GAME_TYPE, CSV_FILE_NAME, COUNTRY, GAME_NAME, SEASON]
 
+
 # COLUMN NAMES
-DATE = csv_propinfo("date", True, "data", True, "date", "playdate format: dd/mm/yyyy")
+DATE = csv_propinfo("date", True, "data", False, "date", "playdate format: dd/mm/yyyy")
 HOME = csv_propinfo("home", True, "data", True, "string", "name of home playing team")
 AWAY = csv_propinfo("away", True, "data", True, "string", "name of away playing team")
+SCORE = csv_propinfo("score", True, "data", True, "string", "string of score int:int")
 HOME_GOALS = csv_propinfo(
-    "home_goals", True, "data", True, "int", "nr goals of home team incl aet"
+    "home_goals", False, "data", False, "int", "nr goals of home team incl aet"
 )
 AWAY_GOALS = csv_propinfo(
-    "away_goals", True, "data", True, "int", "nr goals of away team incl aet"
+    "away_goals", False, "data", False, "int", "nr goals of away team incl aet"
 )
-URL = csv_propinfo("url", True, "data", True, "string", "full source path (hhtp url)")
+URL = csv_propinfo("url", True, "data", True, "string", "full source path (http url)")
 HOME_MANAGER = csv_propinfo(
     "home_manager", True, "data", True, "string", "managers name home team"
 )
@@ -55,6 +58,7 @@ DEFAULT_COLUMN_NAMES = [
     DATE,
     HOME,
     AWAY,
+    SCORE,
     HOME_GOALS,
     AWAY_GOALS,
     URL,
@@ -64,6 +68,7 @@ DEFAULT_COLUMN_NAMES = [
     AWAY_SHEET,
 ]
 
+
 # EXTRA (CUP) COLUMN NAMES
 SCORE_45 = csv_propinfo(
     "score_45", True, "data", True, "string", 'score after 45minutes "x:x"'
@@ -72,10 +77,10 @@ SCORE_90 = csv_propinfo(
     "score_90", True, "data", True, "string", 'score after 90minutes "x:x"'
 )
 SCORE_105 = csv_propinfo(
-    "score_105", True, "data", False, "string", 'score after 105minutes "x:x"'
+    "score_105", True, "data", True, "string", 'score after 105minutes "x:x"'
 )
 SCORE_120 = csv_propinfo(
-    "score_120", True, "data", False, "string", 'score after 120minutes "x:x"'
+    "score_120", True, "data", True, "string", 'score after 120minutes "x:x"'
 )
 AET = csv_propinfo(
     "aet", True, "data", False, "bool", "bool: extra time needed to end game?"
