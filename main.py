@@ -1,10 +1,6 @@
 from tools.controller.seq_manager import ProcessController
 
 
-import sys
-import time
-
-
 def main():
     controller = ProcessController()
     controller.do_all()
