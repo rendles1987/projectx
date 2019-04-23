@@ -1,6 +1,37 @@
 from collections import namedtuple
 
-COUNTRY_WHITE_LIST = ["ger", "eng", "por", "esp", "fra", "ita", "ned"]
+COUNTRY_WHITE_LIST = ["eng", "esp", "fra", "ger", "ita", "ned", "por"]
+
+COUNTRY_LEAGUE_NAMES = {
+    "eng": {1: "premier_league", 2: "championship", 3: "league_one", 4: "league_two"},
+    "esp": {1: "primera_division", 2: "segunda_division"},
+    "fra": {1: "ligue_1", 2: "ligue_2"},
+    "ger": {1: "bundesliga", 2: "2_bundesliga"},
+    "ita": {1: "serie_a", 2: "serie_b"},
+    "ned": {1: "eredivisie"},
+    "por": {1: "primeira_liga"},
+}
+
+COUNTRY_CUP_NAMES = {
+    "eng": {
+        1: "fa_cup",
+        2: "league_cup",
+        3: "community_shield",
+        4: "playoff_championship",
+    },
+    "esp": {1: "copa_del_rey", 2: "supercopa"},
+    "fra": {1: "coupe_de_france", 2: "coupe_de_la_ligue", 3: "trophee_des_champions"},
+    "ger": {1: "dfb_pokal", 2: "liga_pokal", 3: "supercup"},
+    "ita": {1: "coppa_italia", 2: "supercoppa"},
+    "ned": {1: "knvb_beker"},
+    "por": {1: "supertaca", 2: "taca", 3: "taca_da_liga"},
+    "eur": {
+        1: "europa_league",
+        2: "europa_league_qual",
+        3: "champions_league",
+        4: "champions_league_qual",
+    },
+}
 
 RAW_CSV_DIRS = {
     "cup": "/work/data/raw_data/cup",
@@ -17,18 +48,18 @@ csv_propinfo = namedtuple(
 
 # NOT COLUMN NAMES
 CSV_FILE_DIR = csv_propinfo(
-    "csv_file_dir", False, "filedir", True, "string", "absolute dir without filename"
+    "csv_file_dir", False, "filedir", False, "string", "absolute dir without filename"
 )
 GAME_TYPE = csv_propinfo(
-    "game_type", False, "filename", True, "string", "cup of league"
+    "game_type", False, "filedir", False, "string", "cup of league"
 )
 CSV_FILE_NAME = csv_propinfo(
-    "csv_file_name", False, "filename", True, "string", "filename + extension"
+    "csv_file_name", False, "filename", False, "string", "filename + extension"
 )
 COUNTRY = csv_propinfo(
-    "country", False, "filename", True, "string", '3 chars abbrev e.g: "ger"'
+    "country", False, "filename", False, "string", '3 chars abbrev e.g: "ger"'
 )
-GAME_NAME = csv_propinfo("game_name", False, "filename", True, "string", "e.g. knvb")
+GAME_NAME = csv_propinfo("game_name", False, "filename", False, "string", "e.g. knvb")
 SEASON = csv_propinfo(
     "season", False, "filename", False, "int", '"2008/2009" will be int(2008)'
 )

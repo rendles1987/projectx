@@ -44,7 +44,7 @@ class ProcessController:
                 league_adapter = LeagueCsvAdapter(csv_file_path)
                 league_adapter.run()
             # TODO: enable also cup and player!
-            # elif csv_type == 'cup':
+            # elif csv_type == "cup":
             #     cup_adapter = CupCsvAdapter(csv_file_path)
             #     cup_adapter.run()
         log.info("shutting down")
