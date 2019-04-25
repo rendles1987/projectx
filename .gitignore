@@ -41,7 +41,7 @@ etc/*.logrotate
 
 # Ignore ide's
 .idea/
-raw_data/
+data/
 docker-compose.override.yml
 remote_debug.py
 .dockerignore
