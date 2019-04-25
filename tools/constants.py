@@ -39,6 +39,13 @@ RAW_CSV_DIRS = {
     "player": "/work/data/raw_data/player",
 }
 
+CLEAN_CSV_DIRS = {
+    "cup": "/work/data/clean_data/cup",
+    "league": "/work/data/clean_data/league",
+    "player": "/work/data/clean_data/player",
+}
+
+
 # csv variable information
 csv_propinfo = namedtuple(
     "csv_propinfo",
@@ -143,3 +150,5 @@ FLOAT = csv_dtypes("float", "float64", "float64")
 BOOL = csv_dtypes("bool", "bool", "bool_")
 DATE = csv_dtypes("date", "datetime64", "datetime64[ns]")
 DTYPES = [STRING, INT, FLOAT, BOOL, DATE]
+
+PLAYER_PROPERTIES = "temp"
