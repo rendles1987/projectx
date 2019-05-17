@@ -1,0 +1,4 @@
+*		# tell git to ignore all files in the folder
+*/		# tell git to ignore also sub folders.
+!.gitignore	# tell git to still include the .gitignore file. so that this folder exists when e.g. cloning git repo
+
