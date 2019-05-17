@@ -17,6 +17,48 @@ from tools.constants import (
     DTYPES,
 )
 
+from tools.logging import log
+
+
+def check_fix_required(csv_path):
+    temp_df = pd.read_csv(csv_path, sep="\t")
+    nan_in_df = temp_df.isnull().values.any()
+    if nan_in_df:
+        return False
+    return True
+
+
+def detect_delimeter_type(csv_file_full_path):
+    """" detects whether it is a .csv or .tsv """
+
+    # just try tab first
+    try:
+        pd_text_file_reader = pd.read_csv(
+            csv_file_full_path, sep="\t", skiprows=0, chunksize=1
+        )
+        row = pd_text_file_reader.get_chunk()
+        row["date"]
+        return "\t"
+    except Exception:
+        try:
+            pd_text_file_reader = pd.read_csv(
+                csv_file_full_path, sep=",", skiprows=0, chunksize=1
+            )
+            row = pd_text_file_reader.get_chunk()
+            row["date"]
+            return ","
+        except Exception:
+            raise AssertionError(csv_file_full_path + "not a .tsv/.csv ??")
+
+
+def remove_tab_strings(csv_path):
+    unwanted_strings = [r"\t", r"\r", r"\n", r"\\t", r"\\r", r"\\n"]
+    new_df = pd.read_csv(csv_path, sep="\t")
+    for unwanted in unwanted_strings:
+        new_df.replace(unwanted, "", regex=True, inplace=True)
+    os.remove(csv_path)
+    df_to_csv(new_df, csv_path)
+
 
 def fix_nan_values(csv_path):
     """
@@ -54,6 +96,8 @@ def fix_nan_values(csv_path):
     for row_idx, row in enumerate(
         pd.read_csv(csv_path, sep="\t", skiprows=0, chunksize=1)
     ):
+
+        log.info("fix_nan_values row_index: " + str(row_idx))
 
         shift_right = 0
 
@@ -131,7 +175,7 @@ def is_panda_df_empty(panda_df):
         raise AssertionError("No ValueError or AttributeError, but: " + str(e))
 
 
-def check_properties(props, orig_df_columns):
+def check_properties(props, orig_df_columns, csv_full_path):
     strip_clms = [prop.name for prop in props if prop.strip_whitespace]
     expected_clms = [prop.name for prop in props if prop.is_column_name]
     string_fields = [prop.name for prop in props if prop.desired_type == "string"]
@@ -153,7 +197,9 @@ def check_properties(props, orig_df_columns):
     existing_clms = orig_df_columns
     for expected_clm in expected_clms:
         if expected_clm not in existing_clms:
-            raise AssertionError(expected_clm + " not in existing csv columns")
+            raise AssertionError(
+                csv_full_path + " " + expected_clm + " not in existing csv columns"
+            )
 
 
 def df_to_csv(df, csv_path):
@@ -221,7 +267,8 @@ class BaseCsvAdapter:
     def dataframe(self):
         if not is_panda_df_empty(self._dataframe):
             return self._dataframe
-        self._dataframe = pd.read_csv(self.csv_file_full_path, sep="\t")
+        delimiter_type = detect_delimeter_type(self.csv_file_full_path)  # '\t' or ','
+        self._dataframe = pd.read_csv(self.csv_file_full_path, sep=delimiter_type)
         return self._dataframe
 
     @property
@@ -301,7 +348,9 @@ class LeagueCsvAdapter(BaseCsvAdapter):
 
     def run(self):
         # 1. first do some checks on constants
-        check_properties(self.properties, self.dataframe.columns.tolist())
+        check_properties(
+            self.properties, self.dataframe.columns.tolist(), self.csv_file_full_path
+        )
 
         # 2. get info from filename
         filename_checker = LeagueFilenameChecker(self.csv_file_full_path)
@@ -341,7 +390,7 @@ class CupCsvAdapter(BaseCsvAdapter):
     def run(self):
         # 1. first do some checks on constants
         existing_columns = self.dataframe.columns.tolist()
-        check_properties(self.properties, existing_columns)
+        check_properties(self.properties, existing_columns, self.csv_file_full_path)
 
         # 2. get info from filename
         filename_checker = CupFilenameChecker(self.csv_file_full_path)
@@ -379,7 +428,9 @@ class PlayerCsvAdapter(BaseCsvAdapter):
 
     def run(self):
         # 1. first do some checks on constants
-        check_properties(self.properties, self.dataframe.columns.tolist())
+        check_properties(
+            self.properties, self.dataframe.columns.tolist(), self.csv_file_full_path
+        )
 
         # 2. get info from filename
         filename_checker = PlayerFilenameChecker(self.csv_file_full_path)

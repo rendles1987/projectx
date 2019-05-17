@@ -41,44 +41,60 @@ def convert_dtypes(df_row, clm_desired_dtype_dict):
     return df_row.astype(clm_desired_dtype_dict)
 
 
-def date_in_range(df_row, column_name, min_date, max_date):
-    date_format = "%d/%m/%Y"
-    date = pd.to_datetime(df_row[column_name], format=date_format)
-    okay = (date > min_date).bool() & (date < max_date).bool()
-    if not okay:
-        msg = column_name + " not in logic range"
-        return False, msg
-    return True, ""
+# def date_in_range(df_row, column_name, min_date, max_date):
+#     date_format = "%d/%m/%Y"
+#     date = pd.to_datetime(df_row[column_name], format=date_format)
+#     okay = (date > min_date).bool() & (date < max_date).bool()
+#     if not okay:
+#         msg = column_name + " not in logic range"
+#         return False, msg
+#     return True, ""
 
 
-def string_len_in_range(df_row, column_name, min_len, max_len):
-    okay = (df_row[column_name].str.len() > min_len).bool() & (
-        df_row[column_name].str.len() < max_len
-    ).bool()
-    if okay:
-        return True, ""
-    msg = "home too little/much chars: " + df_row[column_name].values[0]
-    return False, msg
+# def string_len_in_range(df_row, column_name, min_len, max_len):
+#     okay = (df_row[column_name].str.len() > min_len).bool() & (
+#         df_row[column_name].str.len() < max_len
+#     ).bool()
+#     if okay:
+#         return True, ""
+#     msg = (
+#         str(column_name)
+#         + " too little/much chars: "
+#         + str(df_row[column_name].values[0])
+#     )
+#     return False, msg
 
 
-def score_format(column_name, df_row, max_nr_digits):
-    """ - this string must be 3 chars long e.g "3:5"
-        - field must contain 1 digit int, a colon (:), and 1 digit int"""
-    score_string = df_row[column_name].values[0]
-    home_score = score_string.split(":")[0]
-    away_score = score_string.split(":")[1]
+# def score_format(column_name, df_row, max_nr_digits):
+#     """ - this string must be 3 chars long e.g "3:5"
+#         - field must contain 1 digit int, a colon (:), and 1 digit int"""
+#     score_string = df_row[column_name].values[0]
+#     home_score = score_string.split(":")[0]
+#     away_score = score_string.split(":")[1]
+#
+#     okay = (
+#         score_string.count(":") == 1
+#         and home_score.isdigit()
+#         and away_score.isdigit()
+#         and len(home_score) <= max_nr_digits
+#         and len(away_score) <= max_nr_digits
+#     )
+#     if okay:
+#         return True, ""
+#     msg = "not correct score format: " + score_string
+#     return False, msg
 
-    okay = (
-        score_string.count(":") == 1
-        and home_score.isdigit()
-        and away_score.isdigit()
-        and len(home_score) <= max_nr_digits
-        and len(away_score) <= max_nr_digits
-    )
-    if okay:
-        return True, ""
-    msg = "not correct score format: " + score_string
-    return False, msg
+
+# def url_unknown(column_name, df_row_convert_strip, expected_unknown, expected_known):
+#     okay = (
+#         expected_known in df_row_convert_strip[column_name]
+#         or expected_unknown in df_row_convert_strip[column_name]
+#     )
+#     if okay:
+#         return True, ""
+#     unexpected_string = df_row_convert_strip[column_name]
+#     msg = "unexpected unknown in column: " + column_name + ": " + unexpected_string
+#     return False, msg
 
 
 class LeagueRowChecker:
@@ -92,7 +108,7 @@ class LeagueRowChecker:
         self.min_date = pd.to_datetime("31/12/1999", format=self.date_format)
         self.max_date = pd.to_datetime("31/12/2019", format=self.date_format)
 
-    def pre_checks(self, row_idx, df_row):
+    def row_checks(self, row_idx, df_row):
         # 1. can convert columns?
         okay, msg = can_convert_dtypes(df_row, self.clm_desired_dtype_dict)
         if not okay:
@@ -106,48 +122,42 @@ class LeagueRowChecker:
             return False
         return True
 
-    def check_date_in_range(self, row_idx, df_row_convert_strip):
-        column_name = "date"
-        okay, msg = date_in_range(
-            df_row_convert_strip, column_name, self.min_date, self.max_date
-        )
-        if not okay:
-            self.check_results.add_invalid(row_idx, msg)
-
-    def check_score_format(self, row_idx, df_row_convert_strip):
-        column_name = "score"
-        max_nr_digits = 1  # for league results we expect nr of goals 1 team <10
-        okay, msg = score_format(column_name, df_row_convert_strip, max_nr_digits)
-        if not okay:
-            self.check_results.add_invalid(row_idx, msg)
-
-    def check_string_len_in_range(self, row_idx, df_row_convert_strip):
-        for column_name, min_len, max_len in [
-            ("home", 2, 30),
-            ("away", 2, 30),
-            ("url", 50, 150),
-            ("home_manager", 3, 30),
-            ("away_manager", 3, 30),
-            # ("home_sheet", 2, 20),
-            # ("home_sheet", 2, 20),
-        ]:
-            okay, msg = string_len_in_range(
-                df_row_convert_strip, column_name, min_len, max_len
-            )
-            if not okay:
-                self.check_results.add_invalid(row_idx, msg)
+    # def check_date_in_range(self, row_idx, df_row_convert_strip):
+    #     column_name = "date"
+    #     okay, msg = date_in_range(
+    #         df_row_convert_strip, column_name, self.min_date, self.max_date
+    #     )
+    #     if not okay:
+    #         self.check_results.add_invalid(row_idx, msg)
+    #
+    # def check_score_format(self, row_idx, df_row_convert_strip):
+    #     column_name = "score"
+    #     max_nr_digits = 1  # for league results we expect nr of goals 1 team <10
+    #     okay, msg = score_format(column_name, df_row_convert_strip, max_nr_digits)
+    #     if not okay:
+    #         self.check_results.add_invalid(row_idx, msg)
+    #
+    # def check_url_unknown(self, row_idx, df_row_convert_strip):
+    #     column_name = "url"
+    #     expected_unknown = "no_url_exists"
+    #     expected_known = "http://www."
+    #     okay, msg = url_unknown(
+    #         column_name, df_row_convert_strip, expected_unknown, expected_known
+    #     )
+    #     if not okay:
+    #         self.check_results.add_invalid(row_idx, msg)
 
     def run(self, row_idx, df_row):
         s_row_idx = str(row_idx)
         log.info(f"check row {s_row_idx}/{self.df_nr_rows}")
+        self.row_checks(row_idx, df_row)
 
-        if not self.pre_checks(row_idx, df_row):
-            return
-        df_row_convert = convert_dtypes(df_row, self.clm_desired_dtype_dict)
-        df_row_convert_strip = strip_columns(df_row_convert, self.strip_clmns)
-        self.check_date_in_range(row_idx, df_row_convert_strip)
-        self.check_score_format(row_idx, df_row_convert_strip)
-        self.check_string_len_in_range(row_idx, df_row_convert_strip)
+        # df_row_convert = convert_dtypes(df_row, self.clm_desired_dtype_dict)
+        # df_row_convert_strip = strip_columns(df_row_convert, self.strip_clmns)
+
+        # self.check_date_in_range(row_idx, df_row_convert_strip)
+        # self.check_score_format(row_idx, df_row_convert_strip)
+        # self.check_url_unknown(row_idx, df_row_convert_strip)
 
 
 class CupRowChecker(LeagueRowChecker):
@@ -163,27 +173,11 @@ class CupRowChecker(LeagueRowChecker):
         self.min_date = pd.to_datetime("31/12/1999", format=self.date_format)
         self.max_date = pd.to_datetime("31/12/2019", format=self.date_format)
 
-    def check_score_format(self, row_idx, df_row_convert_strip):
-        column_name = "score"
-        max_nr_digits = (
-            2
-        )  # for league results we expect nr of goals of one team <100 incl penalties
-        okay, msg = score_format(column_name, df_row_convert_strip, max_nr_digits)
-        if not okay:
-            self.check_results.add_invalid(row_idx, msg)
-
-    def check_string_len_in_range(self, row_idx, df_row_convert_strip):
-        for column_name, min_len, max_len in [
-            ("home", 2, 30),
-            ("away", 2, 30),
-            ("url", 50, 150),
-            ("home_manager", 3, 30),
-            ("away_manager", 3, 30),
-            # ("home_sheet", 2, 20),
-            # ("home_sheet", 2, 20),
-        ]:
-            okay, msg = string_len_in_range(
-                df_row_convert_strip, column_name, min_len, max_len
-            )
-            if not okay:
-                self.check_results.add_invalid(row_idx, msg)
+    # def check_score_format(self, row_idx, df_row_convert_strip):
+    #     column_name = "score"
+    #     max_nr_digits = (
+    #         2
+    #     )  # noqa for cup results we expect nr of goals of 1 team <100 incl penalties
+    #     okay, msg = score_format(column_name, df_row_convert_strip, max_nr_digits)
+    #     if not okay:
+    #         self.check_results.add_invalid(row_idx, msg)
