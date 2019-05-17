@@ -7,7 +7,11 @@ from tools.csv_adapter.raw_csv_adapter import (
 )
 from tools.constants import RAW_CSV_DIRS, CLEAN_CSV_DIRS
 from tools.csv_adapter.filename_checker import CupFilenameChecker, LeagueFilenameChecker
-from tools.csv_adapter.raw_csv_adapter import fix_nan_values
+from tools.csv_adapter.raw_csv_adapter import (
+    fix_nan_values,
+    check_fix_required,
+    remove_tab_strings,
+)
 from tools.csv_adapter.csv_dir_info import RawCsvInfo, CleanCsvInfo
 from tools.logging import log
 
@@ -121,9 +125,19 @@ class ProcessController:
         log.info("correct_nan_in_csv")
         raw_csv_info = RawCsvInfo()
         for csv_type, csv_file_path in raw_csv_info.csv_info:
+            # i've only seen this in the cup csvs
             if csv_type == "cup":
-                # fix nan and replace csv file
-                fix_nan_values(csv_file_path)
+                # first check if fix_nan_values() is required
+                fix_required = check_fix_required(csv_file_path)
+                if fix_required:
+                    # fix nan and replace csv file
+                    fix_nan_values(csv_file_path)
+
+    def remove_tab_strings_from_df(self):
+        log.info("remove tab strings from pd df")
+        raw_csv_info = RawCsvInfo()
+        for csv_type, csv_file_path in raw_csv_info.csv_info:
+            remove_tab_strings(csv_file_path)
 
     def convert_csv_data(self):
         """
@@ -180,7 +194,8 @@ class ProcessController:
         self.copy_raw_to_clean()
         self.improve_cleaned_filename()  # replace '-' with '_'
         self.check_improved_filename()  # raises when filename incorrect
-        self.correct_nan_in_csv()  # shifts cells in cup csv to right and add 'NA'
+        self.correct_nan_in_csv()  # noqa only for cup csv: shifts cells in cup csv to right and add 'NA'  overwrites existing raw_csv
+        self.remove_tab_strings_from_df()  # noqa replace strings like '\t' with '', overwrites existing raw_csv
         self.convert_csv_data()
         # self.start_collect()
         # self.start_check_collect()

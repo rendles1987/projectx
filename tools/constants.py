@@ -137,7 +137,16 @@ AET = csv_propinfo(
 PSO = csv_propinfo(
     "pso", True, "data", False, "bool", "bool: penalties needed to end game?"
 )
-EXTRA_CUP_COLUMN_NAMES = [SCORE_45, SCORE_90, SCORE_105, SCORE_120, AET, PSO]
+EXTRA_CUP_COLUMN_NAMES = [
+    ROUND_TEXT,
+    PLAY_ROUND,
+    SCORE_45,
+    SCORE_90,
+    SCORE_105,
+    SCORE_120,
+    AET,
+    PSO,
+]
 
 BASE_GAME_PROPERTIES = NOT_COLUMN_NAMES + DEFAULT_COLUMN_NAMES
 LEAGUE_GAME_PROPERTIES = BASE_GAME_PROPERTIES

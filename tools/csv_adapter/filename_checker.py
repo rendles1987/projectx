@@ -47,28 +47,28 @@ class LeagueFilenameChecker:
     def __check_country(self):
         # check if 4th char csvfilename is underscore
         assert self.csv_file_name_with_extension[3] == "_", (
-            "4th char of csv file",
-            self.csv_file_name_with_extension,
-            "name is not underscore",
+            self.csv_file_full_path + " 4th char of csv filename is not underscore"
         )
+
         # check if country in whitelist
         assert self.country in COUNTRY_LEAGUE_NAMES.keys(), (
-            "country",
-            self.country,
-            "not in ",
-            COUNTRY_LEAGUE_NAMES.keys(),
+            self.csv_file_full_path
+            + ": country "
+            + self.country
+            + " not in "
+            + COUNTRY_LEAGUE_NAMES.keys()
         )
 
     def __get_game_name(self):
         country = self.country
-        expected_names = COUNTRY_LEAGUE_NAMES.get(country).values()
+        expected_names = list(COUNTRY_LEAGUE_NAMES.get(country).values())
+        # sort list by string length (longest first)
+        expected_names.sort(key=len, reverse=True)
         for gamename in expected_names:
             if gamename in self.csv_file_name_without_extension:
                 return gamename
         # if not found gamename
-        raise Exception(
-            "could not find gamename for " + self.csv_file_name_without_extension
-        )
+        raise Exception(self.csv_file_full_path + ": could not find gamename")
 
     def __get_season(self):
         """
@@ -76,13 +76,20 @@ class LeagueFilenameChecker:
         >>> [int(s) for s in str.split() if s.isdigit()]
         [23, 11, 2]
         """
+
+        csv_filename_without_gamename = self.csv_file_name_without_extension.replace(
+            self.game_name, ""
+        )
         numbers = [
-            int(s)
-            for s in self.csv_file_name_without_extension.split("_")
-            if s.isdigit()
+            int(s) for s in csv_filename_without_gamename.split("_") if s.isdigit()
         ]
+
         season = min(numbers)
-        assert 2000 <= season <= 2019
+        if not 2000 <= season <= 2019:
+            print("wtf")
+        assert 2000 <= season <= 2019, (
+            self.csv_file_full_path + ": season " + str(season) + " not logic"
+        )
         return season
 
     def check_all(self):
@@ -114,16 +121,16 @@ class CupFilenameChecker(LeagueFilenameChecker):
     def __check_country(self):
         # check if 4th char csvfilename is underscore
         assert self.csv_file_name_with_extension[3] == "_", (
-            "4th char of csv file",
-            self.csv_file_name_with_extension,
-            "name is not underscore",
+            self.csv_file_full_path + " 4th char of csv filename is not underscore"
         )
+
         # check if country in whitelist
         assert self.country in COUNTRY_CUP_NAMES.keys(), (
-            "country",
-            self.country,
-            "not in ",
-            COUNTRY_CUP_NAMES.keys(),
+            self.csv_file_full_path
+            + ": country "
+            + self.country
+            + " not in "
+            + COUNTRY_CUP_NAMES.keys()
         )
 
     @property
@@ -135,14 +142,14 @@ class CupFilenameChecker(LeagueFilenameChecker):
 
     def __get_game_name(self):
         country = self.country
-        expected_names = COUNTRY_CUP_NAMES.get(country).values()
+        expected_names = list(COUNTRY_CUP_NAMES.get(country).values())
+        # sort list by string length
+        expected_names.sort(key=len, reverse=True)
         for gamename in expected_names:
             if gamename in self.csv_file_name_without_extension:
                 return gamename
         # if not found gamename
-        raise Exception(
-            "could not find gamename for " + self.csv_file_name_without_extension
-        )
+        raise Exception(self.csv_file_full_path + ": could not find gamename")
 
     def check_all(self):
         self.country
