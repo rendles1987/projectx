@@ -60,3 +60,31 @@ class ImportCsvInfo(RawCsvInfo):
         self.league_dir = IMPORT_CSV_DIRS.get("league")
         self.player_dir = IMPORT_CSV_DIRS.get("player")
         self._csv_info = []  # list with tuples
+
+    def count_total_valid_csv(self):
+        return len(self.get_valid_csv())
+
+    def get_valid_csv(self):
+        return [
+            (game_type, csv)
+            for [game_type, csv] in self.csv_info
+            if csv.endswith("_valid.csv")
+        ]
+
+
+class CleanCsvInfo(RawCsvInfo):
+    def __init__(self):
+        self.cup_dir = CLEAN_CSV_DIRS.get("cup")
+        self.league_dir = CLEAN_CSV_DIRS.get("league")
+        self.player_dir = CLEAN_CSV_DIRS.get("player")
+        self._csv_info = []  # list with tuples
+
+    def count_total_valid_csv(self):
+        return len(self.get_valid_csv())
+
+    def get_valid_csv(self):
+        return [
+            (game_type, csv)
+            for [game_type, csv] in self.csv_info
+            if csv.endswith("_valid.csv")
+        ]

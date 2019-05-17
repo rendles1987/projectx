@@ -1,5 +1,4 @@
-from tools.controller.seq_manager import ProcessController
-import sys
+from tools.controller import ProcessController
 
 
 def main():

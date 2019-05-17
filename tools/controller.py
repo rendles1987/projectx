@@ -1,18 +1,17 @@
 import os
 
-from tools.csv_adapter.raw_csv_adapter import (
-    CupCsvAdapter,
-    LeagueCsvAdapter,
-    PlayerCsvAdapter,
-)
+from tools.csv_importer.raw_csv_importer import CupCsvImporter, LeagueCsvImporter
 from tools.constants import RAW_CSV_DIRS, IMPORT_CSV_DIRS, CLEAN_CSV_DIRS
-from tools.csv_adapter.filename_checker import CupFilenameChecker, LeagueFilenameChecker
-from tools.csv_adapter.raw_csv_adapter import (
+from tools.csv_importer.filename_checker import (
+    CupFilenameChecker,
+    LeagueFilenameChecker,
+)
+from tools.csv_importer.raw_csv_importer import (
     fix_nan_values,
     check_fix_required,
     remove_tab_strings,
 )
-from tools.csv_adapter.csv_dir_info import RawCsvInfo, ImportCsvInfo
+from tools.csv_dir_info import RawCsvInfo, ImportCsvInfo, CleanCsvInfo
 from tools.logging import log
 
 import shutil
@@ -31,42 +30,32 @@ class ProcessController:
         self.import_cup_dir = IMPORT_CSV_DIRS.get("cup")
         self.import_league_dir = IMPORT_CSV_DIRS.get("league")
         self.import_player_dir = IMPORT_CSV_DIRS.get("player")
-
         self.import_dirs = [
             self.import_cup_dir,
             self.import_league_dir,
             self.import_player_dir,
         ]
 
-        """
-        ---------------------------------------------------
-        scrape data                    datasource raw
-        collect all data               ..
-        check scraped data             ..
-        clean scraped data             ..
-        ---------------------------------------------------
-        convert data to desired format datasource adapter 1
-        save data
-        ---------------------------------------------------
-        link players                   datasource enriched
-        travel distance                ..
-        etc                            ..
-        ---------------------------------------------------
-        select data for ML model       datasource adapter 2
-        save data
-        ---------------------------------------------------
-        do ML stuff                    ML
-        ---------------------------------------------------
-        """
+        self.clean_cup_dir = CLEAN_CSV_DIRS.get("cup")
+        self.clean_league_dir = CLEAN_CSV_DIRS.get("league")
+        self.clean_player_dir = CLEAN_CSV_DIRS.get("player")
+        self.clean_dirs = [
+            self.clean_cup_dir,
+            self.clean_league_dir,
+            self.clean_player_dir,
+        ]
 
     def start_scrape(self):
         pass
         # print(NedLeague.scraper_type)
 
-    def check_dirs_exist(self):
-        log.info("check_dirs_exist")
-        for csv_dir in self.raw_dirs + self.import_dirs:
-            assert os.path.isdir(csv_dir)
+    @staticmethod
+    def check_dirs_exist(*args):
+        for directory in args:
+            directory_string = str(directory)
+            log.info(f"check if {directory_string} dirs exist")
+            for csv_dir in directory:
+                assert os.path.isdir(csv_dir)
 
     @staticmethod
     def check_raw_data_exists():
@@ -75,11 +64,25 @@ class ProcessController:
         assert len(raw_csv_info.csv_info) > 0
 
     @staticmethod
+    def check_valid_import_data_exists():
+        log.info("check if 1 or more valid import data files exists")
+        import_csv_info = ImportCsvInfo()
+        assert import_csv_info.count_total_valid_csv() > 0
+
+    @staticmethod
     def empty_import_dirs():
         log.info("empty import dirs")
         import_csv_info = ImportCsvInfo()
         if len(import_csv_info.csv_info) != 0:
             for csv_type, full_path in import_csv_info.csv_info:
+                os.remove(full_path)
+
+    @staticmethod
+    def empty_clean_dirs():
+        log.info("empty clean dirs")
+        clean_csv_info = CleanCsvInfo()
+        if len(clean_csv_info.csv_info) != 0:
+            for csv_type, full_path in clean_csv_info.csv_info:
                 os.remove(full_path)
 
     def copy_raw_to_import(self):
@@ -95,6 +98,21 @@ class ProcessController:
                 if file.endswith(".csv")
             ]
             for csv in csv_paths:
+                shutil.copy(csv, dest_dir)
+
+    def copy_valid_import_to_clean(self):
+        log.info("copy all existing .csv from import to clean dirs")
+        for src_dir, dest_dir in [
+            (self.import_cup_dir, self.clean_cup_dir),
+            (self.import_league_dir, self.clean_league_dir),
+            (self.import_player_dir, self.clean_player_dir),
+        ]:
+            valid_csv_paths = [
+                os.path.join(src_dir, file)
+                for file in os.listdir(src_dir)
+                if file.endswith("_valid.csv")
+            ]
+            for csv in valid_csv_paths:
                 shutil.copy(csv, dest_dir)
 
     def improve_imported_filename(self):
@@ -149,26 +167,17 @@ class ProcessController:
         raw_csv_info = ImportCsvInfo()
         for csv_type, csv_file_path in raw_csv_info.csv_info:
             if csv_type == "league":
-                league_adapter = LeagueCsvAdapter(csv_file_path)
-                league_adapter.run()
+                league_importer = LeagueCsvImporter(csv_file_path)
+                league_importer.run()
             # # TODO: enable also cup and player!
             if csv_type == "cup":
-                cup_adapter = CupCsvAdapter(csv_file_path)
-                cup_adapter.run()
+                cup_importer = CupCsvImporter(csv_file_path)
+                cup_importer.run()
             # elif csv_type == "player":
-            #     player_adapter = PlayerCsvAdapter(csv_file_path)
-            #     player_adapter.run()
+            #     player_importer = PlayerCsvImporter(csv_file_path)
+            #     player_importer.run()
 
-    def start_check_collect(self):
-        pass
-
-    def start_clean_collect(self):
-        pass
-
-    def data_adaption_1(self):
-        pass
-
-    def save_data_1(self):
+    def clean(self):
         pass
 
     def link_players(self):
@@ -186,9 +195,11 @@ class ProcessController:
     def run_ml(self):
         pass
 
-    def do_raw_data(self):
-        # self.start_scrape()
-        self.check_dirs_exist()  # raises when not exists
+    def do_scrape(self):
+        pass
+
+    def do_import(self):
+        self.check_dirs_exist(self.raw_dirs, self.import_dirs)  # raise if not exists
         self.check_raw_data_exists()  # raises when not exists
         self.empty_import_dirs()  # empties dir when not empty
         self.copy_raw_to_import()
@@ -197,13 +208,16 @@ class ProcessController:
         self.correct_nan_in_csv()  # noqa only for cup csv: shifts cells in cup csv to right and add 'NA'  overwrites existing raw_csv
         self.remove_tab_strings_from_df()  # noqa replace strings like '\t' with '', overwrites existing raw_csv
         self.convert_csv_data()
-        # self.start_collect()
-        # self.start_check_collect()
-        # self.start_clean_collect()
-        # self.data_adaption_1()
-        # self.save_data_1()
+
+    def do_clean(self):
+        self.check_dirs_exist(self.import_dirs, self.clean_dirs)  # raise if not exists
+        self.check_valid_import_data_exists()  # raises when not exists
+        self.empty_clean_dirs()  # empties dir when not empty
+        self.copy_valid_import_to_clean()
+        self.clean()
 
     def do_enrich(self):
+        """ from here on no .csv anymore, but to sqlite3 """
         self.link_players()
         self.travel_distance()
         self.data_adaption_2()
@@ -212,7 +226,10 @@ class ProcessController:
         self.run_ml()
 
     def do_all(self):
-        self.do_raw_data()
-        self.do_enrich()
-        self.do_ml()
+        # self.do_scrape()  # scrap data (webpage --> raw)
+
+        # self.do_import()  # import raw data (raw --> import)
+        self.do_clean()  # clean data (import --> clean)
+        # self.do_enrich()  # enrich data (clean --> enrich)
+        # self.do_ml()
         log.info("shutting down")

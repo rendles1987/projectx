@@ -1,12 +1,12 @@
 import pandas as pd
 import os
 
-from tools.csv_adapter.filename_checker import (
+from tools.csv_importer.filename_checker import (
     CupFilenameChecker,
     LeagueFilenameChecker,
     PlayerFilenameChecker,
 )
-from tools.csv_adapter.row_checker import LeagueRowChecker, CupRowChecker
+from tools.csv_importer.row_checker import LeagueRowChecker, CupRowChecker
 
 from tools.constants import (
     BASE_GAME_PROPERTIES,
@@ -225,8 +225,8 @@ def delete_tmp_csv(tmp_csv_path):
         log.warning("want to remove " + tmp_csv_path + " but it does not exists")
 
 
-class BaseCsvAdapter:
-    """each game csv goes trough a child class of GameBaseCsvAdapter.
+class BaseCsvImporter:
+    """each game csv goes trough a child class of BaseCsvImporter.
     Class contains a lot of properties that must be retrieved from game csv
     Two game csv exists: cup, league """
 
@@ -340,9 +340,9 @@ class BaseCsvAdapter:
         raise NotImplementedError
 
 
-class LeagueCsvAdapter(BaseCsvAdapter):
+class LeagueCsvImporter(BaseCsvImporter):
     def __init__(self, csvfilepath):
-        BaseCsvAdapter.__init__(self, csvfilepath)
+        BaseCsvImporter.__init__(self, csvfilepath)
         self.csv_type = "league"
         self.properties = LEAGUE_GAME_PROPERTIES
 
@@ -359,7 +359,7 @@ class LeagueCsvAdapter(BaseCsvAdapter):
         self.game_name = filename_checker.game_name
 
         # 3. get the columns we want
-        log.info("start raw csv adapter class: " + self.__class__.__name__)
+        log.info("start raw csv importer class: " + self.__class__.__name__)
         self.df_only_expected_col = self.dataframe[self.expected_csv_columns]
         self.df_nr_rows = self.df_only_expected_col.shape[0]
 
@@ -383,9 +383,9 @@ class LeagueCsvAdapter(BaseCsvAdapter):
         self.create_valid_invalid_df()
 
 
-class CupCsvAdapter(BaseCsvAdapter):
+class CupCsvImporter(BaseCsvImporter):
     def __init__(self, csvfilepath):
-        BaseCsvAdapter.__init__(self, csvfilepath)
+        BaseCsvImporter.__init__(self, csvfilepath)
         self.csv_type = "cup"
         self.properties = CUP_GAME_PROPERTIES
 
@@ -400,7 +400,7 @@ class CupCsvAdapter(BaseCsvAdapter):
         self.game_name = filename_checker.game_name
 
         # 3. get the columns we want
-        log.info("start raw csv adapter class: " + self.__class__.__name__)
+        log.info("start raw csv importer class: " + self.__class__.__name__)
         self.df_only_expected_col = self.dataframe[self.expected_csv_columns]
         self.df_nr_rows = self.df_only_expected_col.shape[0]
 
@@ -422,9 +422,9 @@ class CupCsvAdapter(BaseCsvAdapter):
         self.create_valid_invalid_df()
 
 
-class PlayerCsvAdapter(BaseCsvAdapter):
+class PlayerCsvImporter(BaseCsvImporter):
     def __init__(self, csvfilepath):
-        BaseCsvAdapter.__init__(self, csvfilepath)
+        BaseCsvImporter.__init__(self, csvfilepath)
         self.csv_type = "player"
         self.properties = PLAYER_PROPERTIES
 

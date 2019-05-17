@@ -1,4 +1,4 @@
-from tools.csv_adapter.check_result import CheckResults
+from tools.csv_importer.check_result import CheckResults
 from tools.logging import log
 
 import pandas as pd
