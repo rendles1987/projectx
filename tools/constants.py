@@ -1,5 +1,26 @@
 from collections import namedtuple
 
+RAW_CSV_DIRS = {
+    "cup": "/work/data/_01_raw/cup",
+    "league": "/work/data/_01_raw/league",
+    "player": "/work/data/_01_raw/player",
+}
+
+IMPORT_CSV_DIRS = {
+    "cup": "/work/data/_02_import/cup",
+    "league": "/work/data/_02_import/league",
+    "player": "/work/data/_02_import/player",
+}
+
+
+CLEAN_CSV_DIRS = {
+    "cup": "/work/data/_03_clean/cup",
+    "league": "/work/data/_03_clean/league",
+    "player": "/work/data/_03_clean/player",
+}
+
+TEMP_DIR = "/work/data/tmp"
+
 COUNTRY_WHITE_LIST = ["eng", "esp", "fra", "ger", "ita", "ned", "por"]
 
 COUNTRY_LEAGUE_NAMES = {
@@ -32,19 +53,6 @@ COUNTRY_CUP_NAMES = {
         4: "champions_league_qual",
     },
 }
-
-RAW_CSV_DIRS = {
-    "cup": "/work/data/raw_data/cup",
-    "league": "/work/data/raw_data/league",
-    "player": "/work/data/raw_data/player",
-}
-
-CLEAN_CSV_DIRS = {
-    "cup": "/work/data/clean_data/cup",
-    "league": "/work/data/clean_data/league",
-    "player": "/work/data/clean_data/player",
-}
-
 
 # csv variable information
 csv_propinfo = namedtuple(
@@ -111,13 +119,12 @@ DEFAULT_COLUMN_NAMES = [
     AWAY_SHEET,
 ]
 
-
 # EXTRA (CUP) COLUMN NAMES
 ROUND_TEXT = csv_propinfo(
     "round_text", True, "data", True, "string", 'play round e.g. "Round of 16"'
 )
 PLAY_ROUND = csv_propinfo(
-    "play_round", True, "data", True, "int", "play round int from 0 to inf"
+    "play_round", True, "data", False, "int", "play round int from 0 to inf"
 )
 SCORE_45 = csv_propinfo(
     "score_45", True, "data", True, "string", 'score after 45minutes "x:x"'

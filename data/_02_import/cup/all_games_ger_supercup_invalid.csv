@@ -1,0 +1,2 @@
+Unnamed: 0	index	date	home	away	score	round_text	play_round	score_45	score_90	score_105	score_120	aet	pso	home_goals	away_goals	season	url	home_manager	away_manager	home_sheet	away_sheet	msg
+0	1	12/08/2018	Eintracht Frankfurt	Bayern M\xfcnchen	-:-	Final	1.0	\n-:-	NA	NA	NA	False	False	-	-	-2018/	http://www.worldfootball.net/report/supercup-2018-finale-eintracht-frankfurt-bayern-muenchen/	Adi H\xfctter	Niko Kova\u010d	[]	[]	"[""could not convert rowinvalid literal for int() with base 10: '-'""]"

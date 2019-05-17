@@ -12,6 +12,7 @@ class LeagueFilenameChecker:
         self.csv_file_full_path = csv_file_full_path
         self._country = None
         self._game_name = None
+        self.names = COUNTRY_LEAGUE_NAMES
         self._season = None
 
     @property
@@ -23,45 +24,59 @@ class LeagueFilenameChecker:
         return (self.csv_file_full_path.split("/")[-1]).split(".")[0]  # 'xx'
 
     @property
+    def csv_file_name_without_prefix(self):
+        prefix = "all_games_"
+        if self.csv_file_name_without_extension.startswith(prefix):
+            csvfilename = self.csv_file_name_without_extension.split(prefix)[1]
+        else:
+            csvfilename = self.csv_file_name_without_extension
+        return csvfilename
+
+    @property
     def country(self):
         if self._country:
             return self._country
-        self._country = self.csv_file_name_with_extension[0:3]
-        self.__check_country()
+        csv_file_name_without_prefix = self.csv_file_name_without_prefix
+        self._country = self._get_country(csv_file_name_without_prefix)
         return self._country
 
     @property
     def game_name(self):
         if self._game_name:
             return self._game_name
-        self._game_name = self.__get_game_name()
+        self._game_name = self._get_game_name()
         return self._game_name
 
     @property
     def season(self):
         if self._season:
             return self._season
-        self._season = self.__get_season()
+        self._season = self._get_season()
         return self._season
 
-    def __check_country(self):
+    def _get_country(self, csv_file_name_without_prefix):
+        """ get it, but first two checks.
+        by the way: filename prefix 'all_games_' is already deleted """
         # check if 4th char csvfilename is underscore
-        assert self.csv_file_name_with_extension[3] == "_", (
-            self.csv_file_full_path + " 4th char of csv filename is not underscore"
+        assert csv_file_name_without_prefix[3] == "_", (
+            csv_file_name_without_prefix + " 4th char of csv filename is not underscore"
         )
 
+        country = csv_file_name_without_prefix[0:3]
         # check if country in whitelist
-        assert self.country in COUNTRY_LEAGUE_NAMES.keys(), (
+        assert country in self.names.keys(), (
             self.csv_file_full_path
             + ": country "
-            + self.country
+            + country
             + " not in "
-            + COUNTRY_LEAGUE_NAMES.keys()
+            + str(self.names.keys())
         )
+        return country
 
-    def __get_game_name(self):
+    def _get_game_name(self):
+        """ get it, but also check it """
         country = self.country
-        expected_names = list(COUNTRY_LEAGUE_NAMES.get(country).values())
+        expected_names = list(self.names.get(country).values())
         # sort list by string length (longest first)
         expected_names.sort(key=len, reverse=True)
         for gamename in expected_names:
@@ -70,13 +85,13 @@ class LeagueFilenameChecker:
         # if not found gamename
         raise Exception(self.csv_file_full_path + ": could not find gamename")
 
-    def __get_season(self):
-        """
-        >>> str = "h3110 23 cat 444.4 rabbit 11 2 dog"
-        >>> [int(s) for s in str.split() if s.isdigit()]
-        [23, 11, 2]
-        """
+    def _get_season(self):
+        """ get it, but also check it """
+        """ >>> str = "h3110 23 cat 444.4 rabbit 11 2 dog"
+            >>> [int(s) for s in str.split() if s.isdigit()]
+            [23, 11, 2] """
 
+        # first delete season digits from filename string
         csv_filename_without_gamename = self.csv_file_name_without_extension.replace(
             self.game_name, ""
         )
@@ -84,9 +99,8 @@ class LeagueFilenameChecker:
             int(s) for s in csv_filename_without_gamename.split("_") if s.isdigit()
         ]
 
+        # now check season digits
         season = min(numbers)
-        if not 2000 <= season <= 2019:
-            print("wtf")
         assert 2000 <= season <= 2019, (
             self.csv_file_full_path + ": season " + str(season) + " not logic"
         )
@@ -104,7 +118,7 @@ class CupFilenameChecker(LeagueFilenameChecker):
         self.csv_file_full_path = csv_file_full_path
         self._country = None
         self._game_name = None
-        # self._season = None
+        self.names = COUNTRY_CUP_NAMES
 
     @property
     def season(self):
@@ -114,42 +128,16 @@ class CupFilenameChecker(LeagueFilenameChecker):
     def country(self):
         if self._country:
             return self._country
-        self._country = self.csv_file_name_with_extension[0:3]
-        self.__check_country()
+        csv_file_name_without_prefix = self.csv_file_name_without_prefix
+        self._country = self._get_country(csv_file_name_without_prefix)
         return self._country
-
-    def __check_country(self):
-        # check if 4th char csvfilename is underscore
-        assert self.csv_file_name_with_extension[3] == "_", (
-            self.csv_file_full_path + " 4th char of csv filename is not underscore"
-        )
-
-        # check if country in whitelist
-        assert self.country in COUNTRY_CUP_NAMES.keys(), (
-            self.csv_file_full_path
-            + ": country "
-            + self.country
-            + " not in "
-            + COUNTRY_CUP_NAMES.keys()
-        )
 
     @property
     def game_name(self):
         if self._game_name:
             return self._game_name
-        self._game_name = self.__get_game_name()
+        self._game_name = self._get_game_name()
         return self._game_name
-
-    def __get_game_name(self):
-        country = self.country
-        expected_names = list(COUNTRY_CUP_NAMES.get(country).values())
-        # sort list by string length
-        expected_names.sort(key=len, reverse=True)
-        for gamename in expected_names:
-            if gamename in self.csv_file_name_without_extension:
-                return gamename
-        # if not found gamename
-        raise Exception(self.csv_file_full_path + ": could not find gamename")
 
     def check_all(self):
         self.country

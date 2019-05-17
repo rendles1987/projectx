@@ -5,14 +5,14 @@ from tools.csv_adapter.raw_csv_adapter import (
     LeagueCsvAdapter,
     PlayerCsvAdapter,
 )
-from tools.constants import RAW_CSV_DIRS, CLEAN_CSV_DIRS
+from tools.constants import RAW_CSV_DIRS, IMPORT_CSV_DIRS, CLEAN_CSV_DIRS
 from tools.csv_adapter.filename_checker import CupFilenameChecker, LeagueFilenameChecker
 from tools.csv_adapter.raw_csv_adapter import (
     fix_nan_values,
     check_fix_required,
     remove_tab_strings,
 )
-from tools.csv_adapter.csv_dir_info import RawCsvInfo, CleanCsvInfo
+from tools.csv_adapter.csv_dir_info import RawCsvInfo, ImportCsvInfo
 from tools.logging import log
 
 import shutil
@@ -28,13 +28,14 @@ class ProcessController:
         self.raw_player_dir = RAW_CSV_DIRS.get("player")
         self.raw_dirs = [self.raw_cup_dir, self.raw_league_dir, self.raw_player_dir]
 
-        self.clean_cup_dir = CLEAN_CSV_DIRS.get("cup")
-        self.clean_league_dir = CLEAN_CSV_DIRS.get("league")
-        self.clean_player_dir = CLEAN_CSV_DIRS.get("player")
-        self.clean_dirs = [
-            self.clean_cup_dir,
-            self.clean_league_dir,
-            self.clean_player_dir,
+        self.import_cup_dir = IMPORT_CSV_DIRS.get("cup")
+        self.import_league_dir = IMPORT_CSV_DIRS.get("league")
+        self.import_player_dir = IMPORT_CSV_DIRS.get("player")
+
+        self.import_dirs = [
+            self.import_cup_dir,
+            self.import_league_dir,
+            self.import_player_dir,
         ]
 
         """
@@ -64,30 +65,29 @@ class ProcessController:
 
     def check_dirs_exist(self):
         log.info("check_dirs_exist")
-        for csv_dir in self.raw_dirs + self.clean_dirs:
+        for csv_dir in self.raw_dirs + self.import_dirs:
             assert os.path.isdir(csv_dir)
 
     @staticmethod
     def check_raw_data_exists():
-        log.info("check_raw_data_exists")
+        log.info("check if 1 or more raw data files exists")
         raw_csv_info = RawCsvInfo()
         assert len(raw_csv_info.csv_info) > 0
 
     @staticmethod
-    def empty_clean_dirs():
-        log.info("empty_clean_dirs")
-        clean_csv_info = CleanCsvInfo()
-        # assert len(clean_csv_info.csv_info) == 0
-        if len(clean_csv_info.csv_info) != 0:
-            for csv_type, full_path in clean_csv_info.csv_info:
+    def empty_import_dirs():
+        log.info("empty import dirs")
+        import_csv_info = ImportCsvInfo()
+        if len(import_csv_info.csv_info) != 0:
+            for csv_type, full_path in import_csv_info.csv_info:
                 os.remove(full_path)
 
-    def copy_raw_to_clean(self):
-        log.info("copy_raw_to_clean")
+    def copy_raw_to_import(self):
+        log.info("copy all existing .csv from raw to import dirs")
         for src_dir, dest_dir in [
-            (self.raw_cup_dir, self.clean_cup_dir),
-            (self.raw_league_dir, self.clean_league_dir),
-            (self.raw_player_dir, self.clean_player_dir),
+            (self.raw_cup_dir, self.import_cup_dir),
+            (self.raw_league_dir, self.import_league_dir),
+            (self.raw_player_dir, self.import_player_dir),
         ]:
             csv_paths = [
                 os.path.join(src_dir, file)
@@ -97,9 +97,9 @@ class ProcessController:
             for csv in csv_paths:
                 shutil.copy(csv, dest_dir)
 
-    def improve_cleaned_filename(self):
-        log.info("improve_cleaned_filename")
-        for csv_dir in self.clean_dirs:
+    def improve_imported_filename(self):
+        log.info("improve imported filename")
+        for csv_dir in self.import_dirs:
             csv_paths = [
                 os.path.join(csv_dir, file)
                 for file in os.listdir(csv_dir)
@@ -111,9 +111,9 @@ class ProcessController:
 
     @staticmethod
     def check_improved_filename():
-        log.info("check_improved_filename")
-        clean_csvs = CleanCsvInfo()
-        for csv_type, csv_file_path in clean_csvs.csv_info:
+        log.info("check improved filename")
+        import_csvs = ImportCsvInfo()
+        for csv_type, csv_file_path in import_csvs.csv_info:
             if csv_type == "cup":
                 cup_filename_checker = CupFilenameChecker(csv_file_path)
                 cup_filename_checker.check_all()
@@ -146,7 +146,7 @@ class ProcessController:
         3. convert raw csv into desired format
         """
         log.info("convert_csv_data")
-        raw_csv_info = CleanCsvInfo()
+        raw_csv_info = ImportCsvInfo()
         for csv_type, csv_file_path in raw_csv_info.csv_info:
             if csv_type == "league":
                 league_adapter = LeagueCsvAdapter(csv_file_path)
@@ -190,9 +190,9 @@ class ProcessController:
         # self.start_scrape()
         self.check_dirs_exist()  # raises when not exists
         self.check_raw_data_exists()  # raises when not exists
-        self.empty_clean_dirs()  # empties dir when not empty
-        self.copy_raw_to_clean()
-        self.improve_cleaned_filename()  # replace '-' with '_'
+        self.empty_import_dirs()  # empties dir when not empty
+        self.copy_raw_to_import()
+        self.improve_imported_filename()  # replace '-' with '_'
         self.check_improved_filename()  # raises when filename incorrect
         self.correct_nan_in_csv()  # noqa only for cup csv: shifts cells in cup csv to right and add 'NA'  overwrites existing raw_csv
         self.remove_tab_strings_from_df()  # noqa replace strings like '\t' with '', overwrites existing raw_csv

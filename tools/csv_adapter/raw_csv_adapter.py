@@ -8,13 +8,13 @@ from tools.csv_adapter.filename_checker import (
 )
 from tools.csv_adapter.row_checker import LeagueRowChecker, CupRowChecker
 
-from tools.logging import log
 from tools.constants import (
     BASE_GAME_PROPERTIES,
     LEAGUE_GAME_PROPERTIES,
     CUP_GAME_PROPERTIES,
     PLAYER_PROPERTIES,
     DTYPES,
+    TEMP_DIR,
 )
 
 from tools.logging import log
@@ -214,7 +214,7 @@ def df_to_csv(df, csv_path):
         log.warning("creating " + csv_path + ", but it already exists. Replacing..")
         os.remove(csv_path)
     # df.to_csv(csv_path, index=False, sep="\t", na_rep="NA")
-    df.to_csv(csv_path, sep="\t", na_rep="NA")
+    df.to_csv(csv_path, sep="\t", na_rep="NA", index=False)
 
 
 def delete_tmp_csv(tmp_csv_path):
@@ -366,7 +366,9 @@ class LeagueCsvAdapter(BaseCsvAdapter):
         # 4. save to tmp csv
         """now save df to csv and then read row by row. Why? we want a panda Dataframe
         and not a panda Series (result of df.iterrows() and df.iloc[idx]) """
-        tmp_csv_path = "/work/data/tmp_data/tmp.csv"
+
+        tmp_csv_path = os.path.join(TEMP_DIR, "tmp.csv")
+        # tmp_csv_path = "/work/data/tmp_data/tmp.csv"
         df_to_csv(self.df_only_expected_col, tmp_csv_path)
 
         # 5. check row for row
@@ -405,7 +407,7 @@ class CupCsvAdapter(BaseCsvAdapter):
         # 4. save to tmp csv
         """now save df to csv and then read row by row. Why? we want a panda Dataframe
         and not a panda Series (result of df.iterrows() and df.iloc[idx]) """
-        tmp_csv_path = "/work/data/tmp_data/tmp.csv"
+        tmp_csv_path = os.path.join(TEMP_DIR, "tmp.csv")
         df_to_csv(self.df_only_expected_col, tmp_csv_path)
 
         # 5. check row for row

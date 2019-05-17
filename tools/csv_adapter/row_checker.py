@@ -168,10 +168,10 @@ class CupRowChecker(LeagueRowChecker):
         self.df_row_convert_strip = None
         self.check_results = CheckResults()
         # TODO put these constants in constants.py
-        self.date_format = "%d/%m/%Y"
+        self.date_format = "%Y/%m/%d"
         # TODO: min_date and max_date should depend on season
-        self.min_date = pd.to_datetime("31/12/1999", format=self.date_format)
-        self.max_date = pd.to_datetime("31/12/2019", format=self.date_format)
+        self.min_date = pd.to_datetime("1999/12/31", format=self.date_format)
+        self.max_date = pd.to_datetime("2019/12/12", format=self.date_format)
 
     # def check_score_format(self, row_idx, df_row_convert_strip):
     #     column_name = "score"
