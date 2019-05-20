@@ -3,7 +3,7 @@ from tools.controller import ProcessController
 
 def main():
     controller = ProcessController()
-    controller.do_all()
+    controller.run()
 
 
 if __name__ == "__main__":

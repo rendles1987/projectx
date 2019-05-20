@@ -26,15 +26,23 @@ class CheckResults:
             # add new k,v to dict
             self._invalid_dct.update({row_idx: [msg]})
 
-    def get_valid_df(self, stripped_df, clm_desired_dtype_dict):
-        """get valid rows from original panda dataframe """
+    def get_valid_df(self, df_selection, clm_desired_dtype_dict):
+        """get valid rows from original panda dataframe (convert + strip)"""
+
         # first get invalid row indices
         invalid_row_idx_list = self.__get_invalid_row_idx_list()
         # get inverse row indices of dataframe
         valid_row_idx_list = list(
-            set(stripped_df.index.to_list()) - set(invalid_row_idx_list)
+            set(df_selection.index.to_list()) - set(invalid_row_idx_list)
         )
-        return stripped_df.iloc[valid_row_idx_list].astype(clm_desired_dtype_dict)
+        # convert
+        df_convert = df_selection.iloc[valid_row_idx_list].astype(
+            clm_desired_dtype_dict
+        )
+        # strip
+        df_obj = df_convert.select_dtypes(["object"])
+        df_convert[df_obj.columns] = df_obj.apply(lambda x: x.str.strip())
+        return df_convert.iloc[valid_row_idx_list]
 
     def get_invalid_df(self, df_orig):
         """get invalid rows from original panda dataframe """

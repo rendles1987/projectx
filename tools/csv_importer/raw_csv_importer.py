@@ -17,10 +17,12 @@ from tools.constants import (
     TEMP_DIR,
 )
 
+from tools.csv_importer.check_result import CheckResults
+
 from tools.logging import log
 
 
-def check_fix_required(csv_path):
+def check_nan_fix_required(csv_path):
     temp_df = pd.read_csv(csv_path, sep="\t")
     nan_in_df = temp_df.isnull().values.any()
     if nan_in_df:
@@ -241,13 +243,8 @@ class BaseCsvImporter:
         self._strip_clmns = None
         self._clm_desired_dtype_dct = None
 
-        self.country = None
-        self.season = None
-        self.game_name = None
-
-        self.row_checker = None
         self.df_nr_rows = None
-        self.df_only_expected_col = None
+        self.df = None
 
     @property
     def csv_file_dir(self):
@@ -314,21 +311,55 @@ class BaseCsvImporter:
         self._clm_desired_dtype_dct = clm_desired_dtype_dict
         return self._clm_desired_dtype_dct
 
-    def create_valid_invalid_df(self):
-        count_invalid_rows = self.row_checker.check_results.count_invalid_rows
+    @staticmethod
+    def can_convert_dtypes_table(df, clm_desired_dtype_dict):
+        """Can all columns whole table be converted to desired datatype?"""
+        try:
+            df.astype(clm_desired_dtype_dict)
+            return True
+        except:
+            return False
+
+    @staticmethod
+    def can_convert_dtypes_one_row(df_row, clm_desired_dtype_dict):
+        """Can all columns on row be converted to desired datatype?"""
+        try:
+            df_row.astype(clm_desired_dtype_dict)
+            return True, ""
+        except Exception as e:
+            s = str(e).replace(",", "")
+            msg = "could not convert row" + s
+            return False, msg
+
+    @staticmethod
+    def convert_dtypes(df, clm_desired_dtype_dict):
+        """ convert row or whole table """
+        return df.astype(clm_desired_dtype_dict)
+
+    @staticmethod
+    def do_strip_columns(df):
+        """ strip all object columns of a df row or whole df table """
+        df_obj = df.select_dtypes(["object"])
+        df[df_obj.columns] = df_obj.apply(lambda x: x.str.strip())
+        return df
+
+    def create_valid_invalid_df(self, df_selection, check_results):
+        df_nr_rows = df_selection.shape[0]
+        count_invalid_rows = check_results.count_invalid_rows
+        count_valid_rows = df_nr_rows - count_invalid_rows
+
         if count_invalid_rows > 0:
             log.info(f"create invalid df with {count_invalid_rows} rows")
-            invalid_df = self.row_checker.check_results.get_invalid_df(self.dataframe)
-
+            invalid_df = check_results.get_invalid_df(self.dataframe)
             file_name = self.csv_file_name_without_extension + "_invalid.csv"
             full_path = os.path.join(self.csv_file_dir, file_name)
             # save it
             df_to_csv(invalid_df, full_path)
-        count_valid_rows = self.df_nr_rows - count_invalid_rows
+
         if count_valid_rows > 0:
             log.info(f"create valid (and converted) df with {count_valid_rows} rows")
-            valid_df = self.row_checker.check_results.get_valid_df(
-                self.df_only_expected_col, self.clm_desired_dtype_dict
+            valid_df = check_results.get_valid_df(
+                df_selection, self.clm_desired_dtype_dict
             )
             log.info(f"save valid df")
             file_name = self.csv_file_name_without_extension + "_valid.csv"
@@ -337,7 +368,45 @@ class BaseCsvImporter:
             df_to_csv(valid_df, full_path)
 
     def run(self):
-        raise NotImplementedError
+        # 1. first do some checks on constants
+        check_properties(
+            self.properties, self.dataframe.columns.tolist(), self.csv_file_full_path
+        )
+
+        # 2. get the columns we want
+        log.info("start raw csv importer class: " + self.__class__.__name__)
+        df_selection = self.dataframe[self.expected_csv_columns]
+
+        # 3. check we can take a shortcut (convert whole table at once)
+        whole_table_in_once = self.can_convert_dtypes_table(
+            df_selection, self.clm_desired_dtype_dict
+        )
+        if whole_table_in_once:
+            # 4. do whole table at once (convert, strip and save)
+            df_convert = df_selection.astype(self.clm_desired_dtype_dict)
+            df_convert_stripped = self.do_strip_columns(df_convert)
+            file_name = self.csv_file_name_without_extension + "_valid.csv"
+            full_path = os.path.join(self.csv_file_dir, file_name)
+            df_to_csv(df_convert_stripped, full_path)
+        else:
+            # 5. we need to convert row by row and get wrong rows into seperate df
+            """ save df to csv and then read row by row. Why? we want a panda Dataframe
+            and not a panda Series (result of df.iterrows() and df.iloc[idx]) """
+            tmp_csv_path = os.path.join(TEMP_DIR, "tmp.csv")
+            # tmp_csv_path = "/work/data/tmp_data/tmp.csv"
+            df_to_csv(df_selection, tmp_csv_path)
+            check_results = CheckResults()
+            for row_idx, df_row in enumerate(
+                pd.read_csv(tmp_csv_path, sep="\t", skiprows=0, chunksize=1)
+            ):
+                okay, msg = self.can_convert_dtypes_one_row(
+                    df_row, self.clm_desired_dtype_dict
+                )
+                if not okay:
+                    check_results.add_invalid(row_idx, msg)
+
+            delete_tmp_csv(tmp_csv_path)
+            self.create_valid_invalid_df(df_selection, check_results)
 
 
 class LeagueCsvImporter(BaseCsvImporter):
@@ -346,42 +415,6 @@ class LeagueCsvImporter(BaseCsvImporter):
         self.csv_type = "league"
         self.properties = LEAGUE_GAME_PROPERTIES
 
-    def run(self):
-        # 1. first do some checks on constants
-        check_properties(
-            self.properties, self.dataframe.columns.tolist(), self.csv_file_full_path
-        )
-
-        # 2. get info from filename
-        filename_checker = LeagueFilenameChecker(self.csv_file_full_path)
-        self.country = filename_checker.country
-        self.season = filename_checker.season
-        self.game_name = filename_checker.game_name
-
-        # 3. get the columns we want
-        log.info("start raw csv importer class: " + self.__class__.__name__)
-        self.df_only_expected_col = self.dataframe[self.expected_csv_columns]
-        self.df_nr_rows = self.df_only_expected_col.shape[0]
-
-        # 4. save to tmp csv
-        """now save df to csv and then read row by row. Why? we want a panda Dataframe
-        and not a panda Series (result of df.iterrows() and df.iloc[idx]) """
-
-        tmp_csv_path = os.path.join(TEMP_DIR, "tmp.csv")
-        # tmp_csv_path = "/work/data/tmp_data/tmp.csv"
-        df_to_csv(self.df_only_expected_col, tmp_csv_path)
-
-        # 5. check row for row
-        self.row_checker = LeagueRowChecker(
-            self.clm_desired_dtype_dict, self.df_nr_rows, self.strip_clmns
-        )
-        for row_idx, df_row in enumerate(
-            pd.read_csv(tmp_csv_path, sep="\t", skiprows=0, chunksize=1)
-        ):
-            self.row_checker.run(row_idx, df_row)
-        delete_tmp_csv(tmp_csv_path)
-        self.create_valid_invalid_df()
-
 
 class CupCsvImporter(BaseCsvImporter):
     def __init__(self, csvfilepath):
@@ -389,52 +422,9 @@ class CupCsvImporter(BaseCsvImporter):
         self.csv_type = "cup"
         self.properties = CUP_GAME_PROPERTIES
 
-    def run(self):
-        # 1. first do some checks on constants
-        existing_columns = self.dataframe.columns.tolist()
-        check_properties(self.properties, existing_columns, self.csv_file_full_path)
-
-        # 2. get info from filename
-        filename_checker = CupFilenameChecker(self.csv_file_full_path)
-        self.country = filename_checker.country
-        self.game_name = filename_checker.game_name
-
-        # 3. get the columns we want
-        log.info("start raw csv importer class: " + self.__class__.__name__)
-        self.df_only_expected_col = self.dataframe[self.expected_csv_columns]
-        self.df_nr_rows = self.df_only_expected_col.shape[0]
-
-        # 4. save to tmp csv
-        """now save df to csv and then read row by row. Why? we want a panda Dataframe
-        and not a panda Series (result of df.iterrows() and df.iloc[idx]) """
-        tmp_csv_path = os.path.join(TEMP_DIR, "tmp.csv")
-        df_to_csv(self.df_only_expected_col, tmp_csv_path)
-
-        # 5. check row for row
-        self.row_checker = CupRowChecker(
-            self.clm_desired_dtype_dict, self.df_nr_rows, self.strip_clmns
-        )
-        for row_idx, df_row in enumerate(
-            pd.read_csv(tmp_csv_path, sep="\t", skiprows=0, chunksize=1)
-        ):
-            self.row_checker.run(row_idx, df_row)
-        delete_tmp_csv(tmp_csv_path)
-        self.create_valid_invalid_df()
-
 
 class PlayerCsvImporter(BaseCsvImporter):
     def __init__(self, csvfilepath):
         BaseCsvImporter.__init__(self, csvfilepath)
         self.csv_type = "player"
         self.properties = PLAYER_PROPERTIES
-
-    def run(self):
-        # 1. first do some checks on constants
-        check_properties(
-            self.properties, self.dataframe.columns.tolist(), self.csv_file_full_path
-        )
-
-        # 2. get info from filename
-        filename_checker = PlayerFilenameChecker(self.csv_file_full_path)
-        self.country = filename_checker.country
-        self.game_name = filename_checker.game_name

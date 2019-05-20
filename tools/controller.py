@@ -8,7 +8,7 @@ from tools.csv_importer.filename_checker import (
 )
 from tools.csv_importer.raw_csv_importer import (
     fix_nan_values,
-    check_fix_required,
+    check_nan_fix_required,
     remove_tab_strings,
 )
 from tools.csv_dir_info import RawCsvInfo, ImportCsvInfo, CleanCsvInfo
@@ -113,9 +113,14 @@ class ProcessController:
                 if file.endswith("_valid.csv")
             ]
             for csv in valid_csv_paths:
-                shutil.copy(csv, dest_dir)
+                # remove _valid from filename since it will be validated again in
+                # clean dir
+                # TODO: come up with a better name (what is tegenovergestelde van prefix?)
+                orig_csv_name = csv.split("_valid.csv")[0] + ".csv"
+                shutil.copy(orig_csv_name, dest_dir)
 
     def improve_imported_filename(self):
+        """ replace filename '-' with '_' """
         log.info("improve imported filename")
         for csv_dir in self.import_dirs:
             csv_paths = [
@@ -128,8 +133,8 @@ class ProcessController:
                     os.rename(csv_full_filepath, csv_full_filepath.replace("-", "_"))
 
     @staticmethod
-    def check_improved_filename():
-        log.info("check improved filename")
+    def check_imported_filename():
+        log.info("check imported filename")
         import_csvs = ImportCsvInfo()
         for csv_type, csv_file_path in import_csvs.csv_info:
             if csv_type == "cup":
@@ -140,32 +145,34 @@ class ProcessController:
                 league_filename_checker.check_all()
 
     def correct_nan_in_csv(self):
+        """ only for cup csv: shifts empty cells in cup csv to right and adds
+        'NA' to empty cell """
         log.info("correct_nan_in_csv")
-        raw_csv_info = RawCsvInfo()
-        for csv_type, csv_file_path in raw_csv_info.csv_info:
+        import_csv_info = ImportCsvInfo()
+        for csv_type, csv_file_path in import_csv_info.csv_info:
             # i've only seen this in the cup csvs
             if csv_type == "cup":
                 # first check if fix_nan_values() is required
-                fix_required = check_fix_required(csv_file_path)
-                if fix_required:
+                nan_fix_required = check_nan_fix_required(csv_file_path)
+                if nan_fix_required:
                     # fix nan and replace csv file
                     fix_nan_values(csv_file_path)
+            # else:
+            #     nan_fix_required = check_nan_fix_required(csv_file_path)
+            #     if nan_fix_required:
+            #         raise AssertionError("I only expected nan error in cup csvs..")
 
     def remove_tab_strings_from_df(self):
         log.info("remove tab strings from pd df")
-        raw_csv_info = RawCsvInfo()
-        for csv_type, csv_file_path in raw_csv_info.csv_info:
+        import_csv_info = ImportCsvInfo()
+        for csv_type, csv_file_path in import_csv_info.csv_info:
             remove_tab_strings(csv_file_path)
 
     def convert_csv_data(self):
-        """
-        1. put all csvs in the right dirs! see: tools.constants.py RAW_CSV_DIRS
-        2. empty output folder
-        3. convert raw csv into desired format
-        """
+        """ convert csv data into desired format """
         log.info("convert_csv_data")
-        raw_csv_info = ImportCsvInfo()
-        for csv_type, csv_file_path in raw_csv_info.csv_info:
+        import_csv_info = ImportCsvInfo()
+        for csv_type, csv_file_path in import_csv_info.csv_info:
             if csv_type == "league":
                 league_importer = LeagueCsvImporter(csv_file_path)
                 league_importer.run()
@@ -202,10 +209,10 @@ class ProcessController:
         self.check_dirs_exist(self.raw_dirs, self.import_dirs)  # raise if not exists
         self.check_raw_data_exists()  # raises when not exists
         self.empty_import_dirs()  # empties dir when not empty
-        self.copy_raw_to_import()
+        self.copy_raw_to_import()  # replace '-' with '_'
         self.improve_imported_filename()  # replace '-' with '_'
-        self.check_improved_filename()  # raises when filename incorrect
-        self.correct_nan_in_csv()  # noqa only for cup csv: shifts cells in cup csv to right and add 'NA'  overwrites existing raw_csv
+        self.check_imported_filename()  # raises when filename incorrect
+        self.correct_nan_in_csv()  # noqa only for cup csv: shifts empty cells in cup csv to right and adds 'NA' to empty cell
         self.remove_tab_strings_from_df()  # noqa replace strings like '\t' with '', overwrites existing raw_csv
         self.convert_csv_data()
 
@@ -225,10 +232,9 @@ class ProcessController:
     def do_ml(self):
         self.run_ml()
 
-    def do_all(self):
+    def run(self):
         # self.do_scrape()  # scrap data (webpage --> raw)
-
-        # self.do_import()  # import raw data (raw --> import)
+        self.do_import()  # import raw data (raw --> import)
         self.do_clean()  # clean data (import --> clean)
         # self.do_enrich()  # enrich data (clean --> enrich)
         # self.do_ml()

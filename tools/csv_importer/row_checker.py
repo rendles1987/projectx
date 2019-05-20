@@ -4,43 +4,6 @@ from tools.logging import log
 import pandas as pd
 
 
-def can_strip_columns(df_row, strip_these_columns):
-    """strip some columns in df that have strip_whitespace=True and is_column_name=True
-    :param df_row: 1 panda dataframe row
-    :param strip_these_columns: list
-    :return: updated panda dataframe (with stripped columns)
-    """
-    for clm in strip_these_columns:
-        try:
-            df_row[clm] = df_row[clm].str.strip()
-        except Exception as e:
-            s = str(e).replace(",", "")
-            msg = "could not strip column " + str(clm) + s
-            return False, msg
-    return True, ""
-
-
-def strip_columns(df_row, strip_these_columns):
-    for clm in strip_these_columns:
-        df_row[clm] = df_row[clm].str.strip()
-    return df_row
-
-
-def can_convert_dtypes(df_row, clm_desired_dtype_dict):
-    """Can all columns be converted to desired datatype?"""
-    try:
-        df_row.astype(clm_desired_dtype_dict)
-        return True, ""
-    except Exception as e:
-        s = str(e).replace(",", "")
-        msg = "could not convert row" + s
-        return False, msg
-
-
-def convert_dtypes(df_row, clm_desired_dtype_dict):
-    return df_row.astype(clm_desired_dtype_dict)
-
-
 # def date_in_range(df_row, column_name, min_date, max_date):
 #     date_format = "%d/%m/%Y"
 #     date = pd.to_datetime(df_row[column_name], format=date_format)
@@ -103,20 +66,20 @@ class LeagueRowChecker:
         self.df_nr_rows = df_nr_rows
         self.strip_clmns = strip_clmns
         self.check_results = CheckResults()
-        self.date_format = "%d/%m/%Y"
-        # TODO: min_date and max_date should depend on season
-        self.min_date = pd.to_datetime("31/12/1999", format=self.date_format)
-        self.max_date = pd.to_datetime("31/12/2019", format=self.date_format)
+        # self.date_format = "%d/%m/%Y"
+        # # TODO: min_date and max_date should depend on season
+        # self.min_date = pd.to_datetime("31/12/1999", format=self.date_format)
+        # self.max_date = pd.to_datetime("31/12/2019", format=self.date_format)
 
     def row_checks(self, row_idx, df_row):
         # 1. can convert columns?
-        okay, msg = can_convert_dtypes(df_row, self.clm_desired_dtype_dict)
+        okay, msg = can_convert_dtypes_one_row(df_row, self.clm_desired_dtype_dict)
         if not okay:
             self.check_results.add_invalid(row_idx, msg)
             return False
         df_row_convert = convert_dtypes(df_row, self.clm_desired_dtype_dict)
         # 2. can strip ?
-        okay, msg = can_strip_columns(df_row_convert, self.strip_clmns)
+        okay, msg = can_strip_columns_one_row(df_row_convert, self.strip_clmns)
         if not okay:
             self.check_results.add_invalid(row_idx, msg)
             return False
