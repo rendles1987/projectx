@@ -1,29 +1,22 @@
-import pandas as pd
 import os
 
-from tools.csv_importer.filename_checker import (
-    CupFilenameChecker,
-    LeagueFilenameChecker,
-    PlayerFilenameChecker,
-)
-from tools.csv_importer.row_checker import LeagueRowChecker, CupRowChecker
-
+import pandas as pd
 from tools.constants import (
     BASE_GAME_PROPERTIES,
-    LEAGUE_GAME_PROPERTIES,
     CUP_GAME_PROPERTIES,
-    PLAYER_PROPERTIES,
     DTYPES,
+    LEAGUE_GAME_PROPERTIES,
+    PLAYER_PROPERTIES,
     TEMP_DIR,
 )
-
 from tools.csv_importer.check_result import CheckResults
-
 from tools.logging import log
+from tools.utils import is_panda_df_empty
 
 
 def check_nan_fix_required(csv_path):
-    temp_df = pd.read_csv(csv_path, sep="\t")
+    delimiter_type = detect_delimeter_type(csv_path)  # '\t' or ','
+    temp_df = pd.read_csv(csv_path, sep=delimiter_type)
     nan_in_df = temp_df.isnull().values.any()
     if nan_in_df:
         return False
@@ -95,8 +88,10 @@ def fix_nan_values(csv_path):
 
     import numpy as np
 
+    delimiter_type = detect_delimeter_type(csv_path)  # '\t' or ','
+
     for row_idx, row in enumerate(
-        pd.read_csv(csv_path, sep="\t", skiprows=0, chunksize=1)
+        pd.read_csv(csv_path, sep=delimiter_type, skiprows=0, chunksize=1)
     ):
 
         log.info("fix_nan_values row_index: " + str(row_idx))
@@ -145,36 +140,12 @@ def fix_nan_values(csv_path):
         else:
             new_df = pd.concat([new_df, row_copy], ignore_index=True)
 
-    for clm in new_df.columns:
-        if "unnamed" in clm.lower():
-            new_df.drop(clm, axis=1, inplace=True)
+    # remove columns with "unnamed" in header
+    unnamed_columns = [clm for clm in new_df.columns if "unnamed" in clm.lower()]
+    new_df.drop(unnamed_columns, axis=1, inplace=True)
 
     os.remove(csv_path)
     df_to_csv(new_df, csv_path)
-
-
-def is_panda_df_empty(panda_df):
-    """ check is panda dataframe is empty or not
-    :return: bool """
-    try:
-        if panda_df.empty:
-            return True
-        else:
-            return False
-    except ValueError:
-        try:
-            if panda_df:
-                return False
-            else:
-                return True
-        except Exception as e:
-            raise AssertionError("nested try-except " + str(e))
-    except AttributeError:
-        # 'NoneType' object has no attribute 'empty'
-        return True
-    # all other exceptions
-    except Exception as e:
-        raise AssertionError("No ValueError or AttributeError, but: " + str(e))
 
 
 def check_properties(props, orig_df_columns, csv_full_path):
@@ -236,14 +207,11 @@ class BaseCsvImporter:
         self.csv_type = None
         self.csv_file_full_path = csvfilepath  # '/work/data/raw_data/league/xx.csv'
         self.properties = BASE_GAME_PROPERTIES
-
         self._dataframe = None
         self._expected_csv_columns = None
         self._existing_csv_columns = None
         self._strip_clmns = None
         self._clm_desired_dtype_dct = None
-
-        self.df_nr_rows = None
         self.df = None
 
     @property
@@ -383,6 +351,7 @@ class BaseCsvImporter:
         )
         if whole_table_in_once:
             # 4. do whole table at once (convert, strip and save)
+            log.info(f"++ convert {self.csv_file_name_without_extension} in once")
             df_convert = df_selection.astype(self.clm_desired_dtype_dict)
             df_convert_stripped = self.do_strip_columns(df_convert)
             file_name = self.csv_file_name_without_extension + "_valid.csv"
@@ -390,15 +359,17 @@ class BaseCsvImporter:
             df_to_csv(df_convert_stripped, full_path)
         else:
             # 5. we need to convert row by row and get wrong rows into seperate df
+            log.info(f"-- convert row by row {self.csv_file_name_without_extension}")
             """ save df to csv and then read row by row. Why? we want a panda Dataframe
             and not a panda Series (result of df.iterrows() and df.iloc[idx]) """
             tmp_csv_path = os.path.join(TEMP_DIR, "tmp.csv")
-            # tmp_csv_path = "/work/data/tmp_data/tmp.csv"
             df_to_csv(df_selection, tmp_csv_path)
             check_results = CheckResults()
+            df_nr_rows = df_selection.shape[0]
             for row_idx, df_row in enumerate(
                 pd.read_csv(tmp_csv_path, sep="\t", skiprows=0, chunksize=1)
             ):
+                log.info(f"check row {row_idx}/{df_nr_rows}")
                 okay, msg = self.can_convert_dtypes_one_row(
                     df_row, self.clm_desired_dtype_dict
                 )

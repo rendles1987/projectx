@@ -1,23 +1,25 @@
 import os
+import shutil
 
-from tools.csv_importer.raw_csv_importer import CupCsvImporter, LeagueCsvImporter
-from tools.constants import RAW_CSV_DIRS, IMPORT_CSV_DIRS, CLEAN_CSV_DIRS
+from tools.constants import CLEAN_CSV_DIRS, IMPORT_CSV_DIRS, RAW_CSV_DIRS
+from tools.csv_cleaner.csv_cleaner import (
+    CupCsvCleaner,
+    LeagueCsvCleaner,
+    PlayerCsvCleaner,
+)
+from tools.csv_dir_info import CleanCsvInfo, ImportCsvInfo, RawCsvInfo
 from tools.csv_importer.filename_checker import (
     CupFilenameChecker,
     LeagueFilenameChecker,
 )
 from tools.csv_importer.raw_csv_importer import (
-    fix_nan_values,
+    CupCsvImporter,
+    LeagueCsvImporter,
     check_nan_fix_required,
+    fix_nan_values,
     remove_tab_strings,
 )
-from tools.csv_dir_info import RawCsvInfo, ImportCsvInfo, CleanCsvInfo
 from tools.logging import log
-
-import shutil
-
-# in general:
-# https://stackoverflow.com/questions/39100971/how-do-i-release-memory-used-by-a-pandas-dataframe
 
 
 class ProcessController:
@@ -185,7 +187,19 @@ class ProcessController:
             #     player_importer.run()
 
     def clean(self):
-        pass
+        log.info("clean csv_data")
+        clean_csv_info = CleanCsvInfo()
+        for csv_type, csv_file_path in clean_csv_info.csv_info:
+            if csv_type == "league":
+                league_cleaner = LeagueCsvCleaner(csv_file_path)
+                league_cleaner.run()
+            # # TODO: enable also cup and player!
+            if csv_type == "cup":
+                cup_cleaner = CupCsvCleaner(csv_file_path)
+                cup_cleaner.run()
+            # elif csv_type == "player":
+            #     player_cleaner = PlayerCsvCleaner(csv_file_path)
+            #     player_cleaner.run()
 
     def link_players(self):
         pass
@@ -234,7 +248,7 @@ class ProcessController:
 
     def run(self):
         # self.do_scrape()  # scrap data (webpage --> raw)
-        self.do_import()  # import raw data (raw --> import)
+        # self.do_import()  # import raw data (raw --> import)
         self.do_clean()  # clean data (import --> clean)
         # self.do_enrich()  # enrich data (clean --> enrich)
         # self.do_ml()

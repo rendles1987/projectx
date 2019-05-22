@@ -2,3 +2,4 @@ numpy
 bs4
 requests
 pandas
+lxml

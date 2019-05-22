@@ -42,7 +42,7 @@ COUNTRY_CUP_NAMES = {
     },
     "esp": {1: "copa_del_rey", 2: "supercopa"},
     "fra": {1: "coupe_de_france", 2: "coupe_de_la_ligue", 3: "trophee_des_champions"},
-    "ger": {1: "dfb_pokal", 2: "liga_pokal", 3: "supercup"},
+    "ger": {1: "dfb_pokal", 2: "ligapokal", 3: "supercup"},
     "ita": {1: "coppa_italia", 2: "supercoppa"},
     "ned": {1: "knvb_beker"},
     "por": {1: "supertaca", 2: "taca", 3: "taca_da_liga"},

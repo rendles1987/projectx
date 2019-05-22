@@ -10,9 +10,10 @@ RUN apt-get -y update \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 RUN pip3 install --upgrade pip
+RUN pip install --upgrade pip
 RUN pip3 install setuptools
 
 COPY requirements.txt /work/requirements.txt
 WORKDIR /work
-RUN pip install -r requirements.txt
+RUN pip3 install -r requirements.txt
 CMD python3 /work/main.py

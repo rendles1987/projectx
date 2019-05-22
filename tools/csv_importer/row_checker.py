@@ -1,8 +1,6 @@
+import pandas as pd
 from tools.csv_importer.check_result import CheckResults
 from tools.logging import log
-
-import pandas as pd
-
 
 # def date_in_range(df_row, column_name, min_date, max_date):
 #     date_format = "%d/%m/%Y"

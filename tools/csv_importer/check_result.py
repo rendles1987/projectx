@@ -1,5 +1,5 @@
-from tools.logging import log
 import pandas as pd
+from tools.logging import log
 
 
 class CheckResults:
@@ -42,7 +42,7 @@ class CheckResults:
         # strip
         df_obj = df_convert.select_dtypes(["object"])
         df_convert[df_obj.columns] = df_obj.apply(lambda x: x.str.strip())
-        return df_convert.iloc[valid_row_idx_list]
+        return df_convert
 
     def get_invalid_df(self, df_orig):
         """get invalid rows from original panda dataframe """
