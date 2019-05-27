@@ -25,8 +25,7 @@ def check_nan_fix_required(csv_path):
 
 def detect_delimeter_type(csv_file_full_path):
     """" detects whether it is a .csv or .tsv """
-
-    # just try tab first
+    # is it a .tsv ?
     try:
         pd_text_file_reader = pd.read_csv(
             csv_file_full_path, sep="\t", skiprows=0, chunksize=1
@@ -36,6 +35,7 @@ def detect_delimeter_type(csv_file_full_path):
         return "\t"
     except Exception:
         try:
+            # then it should be a .tsv ?
             pd_text_file_reader = pd.read_csv(
                 csv_file_full_path, sep=",", skiprows=0, chunksize=1
             )
@@ -335,6 +335,36 @@ class BaseCsvImporter:
             # save it
             df_to_csv(valid_df, full_path)
 
+    def import_whole_table_at_once(self, df_selection):
+        """ import whole table at once (convert, strip and save) """
+        log.info(f"++ convert {self.csv_file_name_without_extension} in once")
+        df_convert = df_selection.astype(self.clm_desired_dtype_dict)
+        df_convert_stripped = self.do_strip_columns(df_convert)
+        file_name = self.csv_file_name_without_extension + "_valid.csv"
+        full_path = os.path.join(self.csv_file_dir, file_name)
+        df_to_csv(df_convert_stripped, full_path)
+
+    def import_row_by_row(self, df_selection):
+        """ convert row by row and get wrong rows into seperate df """
+        log.info(f"-- convert row by row {self.csv_file_name_without_extension}")
+        """ save df to csv and then read row by row. Why? we want a panda Dataframe
+        and not a panda Series (result of df.iterrows() and df.iloc[idx]) """
+        tmp_csv_path = os.path.join(TEMP_DIR, "tmp.csv")
+        df_to_csv(df_selection, tmp_csv_path)
+        check_results = CheckResults()
+        df_nr_rows = df_selection.shape[0]
+        for row_idx, df_row in enumerate(
+            pd.read_csv(tmp_csv_path, sep="\t", skiprows=0, chunksize=1)
+        ):
+            log.info(f"check row {row_idx}/{df_nr_rows}")
+            okay, msg = self.can_convert_dtypes_one_row(
+                df_row, self.clm_desired_dtype_dict
+            )
+            if not okay:
+                check_results.add_invalid(row_idx, msg)
+        delete_tmp_csv(tmp_csv_path)
+        self.create_valid_invalid_df(df_selection, check_results)
+
     def run(self):
         # 1. first do some checks on constants
         check_properties(
@@ -350,34 +380,9 @@ class BaseCsvImporter:
             df_selection, self.clm_desired_dtype_dict
         )
         if whole_table_in_once:
-            # 4. do whole table at once (convert, strip and save)
-            log.info(f"++ convert {self.csv_file_name_without_extension} in once")
-            df_convert = df_selection.astype(self.clm_desired_dtype_dict)
-            df_convert_stripped = self.do_strip_columns(df_convert)
-            file_name = self.csv_file_name_without_extension + "_valid.csv"
-            full_path = os.path.join(self.csv_file_dir, file_name)
-            df_to_csv(df_convert_stripped, full_path)
+            self.import_whole_table_at_once(df_selection)
         else:
-            # 5. we need to convert row by row and get wrong rows into seperate df
-            log.info(f"-- convert row by row {self.csv_file_name_without_extension}")
-            """ save df to csv and then read row by row. Why? we want a panda Dataframe
-            and not a panda Series (result of df.iterrows() and df.iloc[idx]) """
-            tmp_csv_path = os.path.join(TEMP_DIR, "tmp.csv")
-            df_to_csv(df_selection, tmp_csv_path)
-            check_results = CheckResults()
-            df_nr_rows = df_selection.shape[0]
-            for row_idx, df_row in enumerate(
-                pd.read_csv(tmp_csv_path, sep="\t", skiprows=0, chunksize=1)
-            ):
-                log.info(f"check row {row_idx}/{df_nr_rows}")
-                okay, msg = self.can_convert_dtypes_one_row(
-                    df_row, self.clm_desired_dtype_dict
-                )
-                if not okay:
-                    check_results.add_invalid(row_idx, msg)
-
-            delete_tmp_csv(tmp_csv_path)
-            self.create_valid_invalid_df(df_selection, check_results)
+            self.import_row_by_row(df_selection)
 
 
 class LeagueCsvImporter(BaseCsvImporter):

@@ -102,24 +102,36 @@ class ProcessController:
             for csv in csv_paths:
                 shutil.copy(csv, dest_dir)
 
+    def copy_rename_one_file(self):
+        pass
+
     def copy_valid_import_to_clean(self):
+        """ copy all "*_valid.csv" files from import to clean dirs"""
         log.info("copy all existing .csv from import to clean dirs")
         for src_dir, dest_dir in [
             (self.import_cup_dir, self.clean_cup_dir),
             (self.import_league_dir, self.clean_league_dir),
             (self.import_player_dir, self.clean_player_dir),
         ]:
-            valid_csv_paths = [
+            valid_csv_full_paths = [
                 os.path.join(src_dir, file)
                 for file in os.listdir(src_dir)
                 if file.endswith("_valid.csv")
             ]
-            for csv in valid_csv_paths:
+            valid_csv_filenames = [file for file in os.listdir(src_dir) if file.endswith("_valid.csv")]
+
+            # copy them
+            for csv_full_path in valid_csv_full_paths:
                 # remove _valid from filename since it will be validated again in
                 # clean dir
-                # TODO: come up with a better name (what is tegenovergestelde van prefix?)
-                orig_csv_name = csv.split("_valid.csv")[0] + ".csv"
-                shutil.copy(orig_csv_name, dest_dir)
+                shutil.copy(csv_full_path, dest_dir)
+
+            # rename the dest files (remove suffix "_valid"
+            for filename in valid_csv_filenames:
+                filename_without_suffix = filename.split("_valid.csv")[0] + ".csv"
+                dest_filename = os.path.join(dest_dir, filename)
+                new_dest_filename = os.path.join(dest_dir, filename_without_suffix)
+                os.rename(dest_filename, new_dest_filename)
 
     def improve_imported_filename(self):
         """ replace filename '-' with '_' """
@@ -193,10 +205,10 @@ class ProcessController:
             if csv_type == "league":
                 league_cleaner = LeagueCsvCleaner(csv_file_path)
                 league_cleaner.run()
-            # # TODO: enable also cup and player!
-            if csv_type == "cup":
+            elif csv_type == "cup":
                 cup_cleaner = CupCsvCleaner(csv_file_path)
                 cup_cleaner.run()
+            # TODO: enable also cup and player!
             # elif csv_type == "player":
             #     player_cleaner = PlayerCsvCleaner(csv_file_path)
             #     player_cleaner.run()

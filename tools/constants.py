@@ -54,6 +54,24 @@ COUNTRY_CUP_NAMES = {
     },
 }
 
+# for checking if play date is in "logic" season range
+# start date of season xxxx = 1st of July --> 01/07/xxxx
+# end date of season xxxx = 1st of July --> 01/07/xxxx+1
+# TODO: now all competitions are expected to have same start and end of season.
+#  Perhaps, we should define this per competition
+season_window_named_tup = namedtuple(
+    "season_window_named_tup", ["month_start", "month_end", "day_start", "day_end"]
+)
+SEASON_WINDOW = season_window_named_tup(7, 7, 1, 1)
+
+
+# for checking if nr goals makes sense
+game_specs_named_tup = namedtuple(
+    "game_specs_named_tup", ["cup_max_goals", "league_max_goals"]
+)
+GAME_SPECS = game_specs_named_tup(20, 10)
+
+
 # csv variable information
 csv_propinfo = namedtuple(
     "csv_propinfo",
