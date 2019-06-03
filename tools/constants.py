@@ -1,22 +1,24 @@
 from collections import namedtuple
 
+dateformat_yyymmdd = "%Y-%m-%d"
+
 RAW_CSV_DIRS = {
-    "cup": "/work/data/_01_raw/cup",
-    "league": "/work/data/_01_raw/league",
-    "player": "/work/data/_01_raw/player",
+    "cup": "/work/data/temp_stuff/_01_raw/cup",
+    "league": "/work/data/temp_stuff/_01_raw/league",
+    "player": "/work/data/temp_stuff/_01_raw/player",
 }
 
 IMPORT_CSV_DIRS = {
-    "cup": "/work/data/_02_import/cup",
-    "league": "/work/data/_02_import/league",
-    "player": "/work/data/_02_import/player",
+    "cup": "/work/data/temp_stuff/_02_import/cup",
+    "league": "/work/data/temp_stuff/_02_import/league",
+    "player": "/work/data/temp_stuff/_02_import/player",
 }
 
 
 CLEAN_CSV_DIRS = {
-    "cup": "/work/data/_03_clean/cup",
-    "league": "/work/data/_03_clean/league",
-    "player": "/work/data/_03_clean/player",
+    "cup": "/work/data/temp_stuff/_03_clean/cup",
+    "league": "/work/data/temp_stuff/_03_clean/league",
+    "player": "/work/data/temp_stuff/_03_clean/player",
 }
 
 TEMP_DIR = "/work/data/tmp"

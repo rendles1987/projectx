@@ -1,5 +1,6 @@
 import pandas as pd
 from tools.logging import log
+from tools.utils import ensure_corect_date_format
 
 
 class CheckResults:
@@ -39,6 +40,9 @@ class CheckResults:
         df_convert = df_selection.iloc[valid_row_idx_list].astype(
             clm_desired_dtype_dict
         )
+
+        df_convert = ensure_corect_date_format(df_convert)
+
         # strip
         df_obj = df_convert.select_dtypes(["object"])
         df_convert[df_obj.columns] = df_obj.apply(lambda x: x.str.strip())

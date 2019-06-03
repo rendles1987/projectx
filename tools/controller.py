@@ -118,7 +118,9 @@ class ProcessController:
                 for file in os.listdir(src_dir)
                 if file.endswith("_valid.csv")
             ]
-            valid_csv_filenames = [file for file in os.listdir(src_dir) if file.endswith("_valid.csv")]
+            valid_csv_filenames = [
+                file for file in os.listdir(src_dir) if file.endswith("_valid.csv")
+            ]
 
             # copy them
             for csv_full_path in valid_csv_full_paths:
@@ -260,7 +262,7 @@ class ProcessController:
 
     def run(self):
         # self.do_scrape()  # scrap data (webpage --> raw)
-        # self.do_import()  # import raw data (raw --> import)
+        self.do_import()  # import raw data (raw --> import)
         self.do_clean()  # clean data (import --> clean)
         # self.do_enrich()  # enrich data (clean --> enrich)
         # self.do_ml()

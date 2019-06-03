@@ -5,13 +5,14 @@ import pandas as pd
 from tools.constants import (
     BASE_GAME_PROPERTIES,
     CUP_GAME_PROPERTIES,
+    GAME_SPECS,
     LEAGUE_GAME_PROPERTIES,
     PLAYER_PROPERTIES,
     SEASON_WINDOW,
-    GAME_SPECS,
+    dateformat_yyymmdd,
 )
 from tools.logging import log
-from tools.utils import is_panda_df_empty
+from tools.utils import df_to_csv, is_panda_df_empty
 
 
 class BaseCsvCleaner:
@@ -59,28 +60,18 @@ class BaseCsvCleaner:
 
     def check_white_list_url(self):
         """ url may only contain 'http'/'https' or np.Nan"""
+        pd.options.mode.chained_assignment = None  # default='warn'
         column_name = "url"
-        # # create Int64Index: select indices where df[column_name] == 'no_url_exists'
-        # no_url_index = self.dataframe[
-        #     self.dataframe[column_name] == "no_url_exists"
-        # ].index
         # create Int64Index: select indices where df[column_name] startswith 'http'
-        try:
-            http_index = self.dataframe[self.dataframe[column_name].str.startswith("http")].index
-        except:
-            pass
-            # self.csv_file_full_path
-            # '/work/data/_03_clean/cup/all_games_ger_dfb_pokal.csv'
-            # wtf, this is a .csv, should be .tsv. HOW COME?
-
-
-        # # merge both Int64Index
-        # union_index = no_url_index.union(http_index)
-        # # update df[column_name] to np.Nan if index is not in http_index
+        http_index = self.dataframe[
+            self.dataframe[column_name].str.startswith("http")
+        ].index
+        # update df[column_name] to np.Nan if index is not in http_index
         self.dataframe[column_name][~self.dataframe.index.isin(http_index)] = np.NAN
+        pd.options.mode.chained_assignment = 'warn'  # default='warn'
 
     def check_table_contains_unknown(self):
-        black_list = ["unkown", "unkwown", "ukwnown"]
+        black_list = ["unkown", "unkwown", "ukwnown"]  # , "unknown"]
         for black_string in black_list:
             # only loop trough string columns
             for column in self.dataframe.select_dtypes(include="O"):
@@ -118,7 +109,7 @@ class BaseCsvCleaner:
 
         # all fail_dates['season'] should be np.NAN otherwise there is problem
         if fail_dates["season"].isna().all():
-            # 'season' is np.NAN (since url is np.NAN)
+            # no problem, so return ('season' is np.NAN (since url is np.NAN))
             return
 
         # now we have a problem: season is not np.NAN and based on that a start- and
@@ -129,7 +120,7 @@ class BaseCsvCleaner:
             f"date out of logic range {self.csv_file_name_without_extension} "
             f"dates are: {log_these_dates}"
         )
-        raise  # TODO: should raise here, but log it or put in another source.. ?
+        raise  # TODO: shouldn't raise here, but log it or put in another source.. ?
 
     def check_date_in_range(self):
         """ get date from column url. For league csv we can also use date in
@@ -140,14 +131,14 @@ class BaseCsvCleaner:
         )
         # first create a season column (based on url)
         self.dataframe["season"] = self.dataframe["url"].apply(self.get_season)
-        date_format = "%d/%m/%Y"
 
         try:
-            date = pd.to_datetime(self.dataframe["date"], format=date_format)
+            date = pd.to_datetime(self.dataframe["date"], format=dateformat_yyymmdd)
         except:
-            pass
-            # wtf.. self.dataframe["date"] of '/work/data/_03_clean/cup/all_games_eng_league_cup.csv'
-            # is like "2000-11-29" and not like expected "%d/%m/%Y"
+            raise AssertionError(
+                "date format fail.. this should have been fixed in "
+                '"ensure_corect_date_format()"'
+            )
 
         # create a start date column
         start_date = pd.to_datetime(
@@ -215,6 +206,11 @@ class BaseCsvCleaner:
     def check_score_logic(self):
         pass
 
+    def save_changes(self):
+        """ remove orig file and save self.dataframe to orig file filepath """
+        os.remove(self.csv_file_full_path)
+        df_to_csv(self.dataframe, self.csv_file_full_path)
+
     def run(self):
         self.check_replace_empty_strings_with_nan()
         self.check_white_list_url()
@@ -222,6 +218,7 @@ class BaseCsvCleaner:
         self.check_date_in_range()
         self.check_score_format()
         self.check_score_logic()
+        self.save_changes()
 
 
 class CupCsvCleaner(BaseCsvCleaner):

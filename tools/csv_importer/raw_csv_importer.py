@@ -11,17 +11,47 @@ from tools.constants import (
 )
 from tools.csv_importer.check_result import CheckResults
 from tools.logging import log
-from tools.utils import is_panda_df_empty
+from tools.utils import df_to_csv, ensure_corect_date_format, is_panda_df_empty
 
 
 def check_nan_fix_required(csv_path):
     delimiter_type = detect_delimeter_type(csv_path)  # '\t' or ','
     temp_df = pd.read_csv(csv_path, sep=delimiter_type)
-    nan_in_df = temp_df.isnull().values.any()
-    if nan_in_df:
-        return False
-    return True
 
+    """ checks if all columns
+    - if column contains False/True and other strings --> then nan_fix_required
+    """
+
+    # this only works for 'cup' csvs
+    score_columns = [clm for clm in temp_df.columns if str(clm).startswith('score_')]
+    for column in score_columns:
+        nr_nan = 0
+        nr_false = 0
+        nr_true = 0
+        contains_nan = temp_df[column].isnull().values.any()
+        contains_false = (temp_df[column] == 'False').any()
+        contains_true = (temp_df[column] == 'True').any()
+
+        if not any((contains_nan, contains_false, contains_true)):
+            continue
+
+        keys = temp_df[column].value_counts(dropna=False).keys().to_list()
+        values = temp_df[column].value_counts(dropna=False).to_list()
+
+        nr_rows = len(temp_df)
+        if contains_false:
+            nr_false = values[keys.index('False')]
+        if contains_true:
+            nr_true = values[keys.index('True')]
+        if contains_nan:
+            nr_nan = nr_rows - temp_df.count()
+        nr_bool = nr_false + nr_true
+
+        if nr_rows - (nr_bool + nr_nan) > 0:
+            # column includes a leftover (no boolean, no nan, but another string?
+            # we need to fix this,
+            return True
+    return False
 
 def detect_delimeter_type(csv_file_full_path):
     """" detects whether it is a .csv or .tsv """
@@ -143,7 +173,6 @@ def fix_nan_values(csv_path):
     # remove columns with "unnamed" in header
     unnamed_columns = [clm for clm in new_df.columns if "unnamed" in clm.lower()]
     new_df.drop(unnamed_columns, axis=1, inplace=True)
-
     os.remove(csv_path)
     df_to_csv(new_df, csv_path)
 
@@ -173,21 +202,6 @@ def check_properties(props, orig_df_columns, csv_full_path):
             raise AssertionError(
                 csv_full_path + " " + expected_clm + " not in existing csv columns"
             )
-
-
-def df_to_csv(df, csv_path):
-    """convert panda dataframe to csv
-    By default the following values are interpreted as NaN:
-        ‘’, ‘#N/A’, ‘#N/A N/A’, ‘#NA’, ‘-1.#IND’, ‘-1.#QNAN’, ‘-NaN’, ‘-nan’,
-        ‘1.#IND’, ‘1.#QNAN’, ‘N/A’, ‘NA’, ‘NULL’, ‘NaN’, ‘n/a’, ‘nan’, ‘null’.
-    Throughout this whole project we deal with pd's nan in the csv as 'NA' (you see
-    NA in the file) """
-    # check if file not already exists
-    if os.path.isfile(csv_path):
-        log.warning("creating " + csv_path + ", but it already exists. Replacing..")
-        os.remove(csv_path)
-    # df.to_csv(csv_path, index=False, sep="\t", na_rep="NA")
-    df.to_csv(csv_path, sep="\t", na_rep="NA", index=False)
 
 
 def delete_tmp_csv(tmp_csv_path):
@@ -300,11 +314,6 @@ class BaseCsvImporter:
             return False, msg
 
     @staticmethod
-    def convert_dtypes(df, clm_desired_dtype_dict):
-        """ convert row or whole table """
-        return df.astype(clm_desired_dtype_dict)
-
-    @staticmethod
     def do_strip_columns(df):
         """ strip all object columns of a df row or whole df table """
         df_obj = df.select_dtypes(["object"])
@@ -339,6 +348,7 @@ class BaseCsvImporter:
         """ import whole table at once (convert, strip and save) """
         log.info(f"++ convert {self.csv_file_name_without_extension} in once")
         df_convert = df_selection.astype(self.clm_desired_dtype_dict)
+        df_convert = ensure_corect_date_format(df_convert)
         df_convert_stripped = self.do_strip_columns(df_convert)
         file_name = self.csv_file_name_without_extension + "_valid.csv"
         full_path = os.path.join(self.csv_file_dir, file_name)
