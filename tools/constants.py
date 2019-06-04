@@ -184,7 +184,11 @@ STRING = csv_dtypes("string", "object", "unicode")
 INT = csv_dtypes("int", "int64", "int64")
 FLOAT = csv_dtypes("float", "float64", "float64")
 BOOL = csv_dtypes("bool", "bool", "bool_")
-DATE = csv_dtypes("date", "datetime64", "datetime64[ns]")
+# DATE = csv_dtypes("date", "datetime64", "datetime64[ns]")
+# convert date with as_type is buggy compared to pd.to_datetime()
+# https://stackoverflow.com/questions/16158795/cant-convert-dates-to-datetime64
+# for now we import date fields as string, and then do the pd.to_datetime()
+DATE = csv_dtypes("date", "object", "unicode")
 DTYPES = [STRING, INT, FLOAT, BOOL, DATE]
 
 PLAYER_PROPERTIES = "temp"

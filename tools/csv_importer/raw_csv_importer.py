@@ -23,14 +23,14 @@ def check_nan_fix_required(csv_path):
     """
 
     # this only works for 'cup' csvs
-    score_columns = [clm for clm in temp_df.columns if str(clm).startswith('score_')]
+    score_columns = [clm for clm in temp_df.columns if str(clm).startswith("score_")]
     for column in score_columns:
         nr_nan = 0
         nr_false = 0
         nr_true = 0
         contains_nan = temp_df[column].isnull().values.any()
-        contains_false = (temp_df[column] == 'False').any()
-        contains_true = (temp_df[column] == 'True').any()
+        contains_false = (temp_df[column] == "False").any()
+        contains_true = (temp_df[column] == "True").any()
 
         if not any((contains_nan, contains_false, contains_true)):
             continue
@@ -40,9 +40,9 @@ def check_nan_fix_required(csv_path):
 
         nr_rows = len(temp_df)
         if contains_false:
-            nr_false = values[keys.index('False')]
+            nr_false = values[keys.index("False")]
         if contains_true:
-            nr_true = values[keys.index('True')]
+            nr_true = values[keys.index("True")]
         if contains_nan:
             nr_nan = nr_rows - temp_df.count()
         nr_bool = nr_false + nr_true
@@ -52,6 +52,7 @@ def check_nan_fix_required(csv_path):
             # we need to fix this,
             return True
     return False
+
 
 def detect_delimeter_type(csv_file_full_path):
     """" detects whether it is a .csv or .tsv """

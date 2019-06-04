@@ -1,7 +1,8 @@
 import os
-
 from tools.constants import dateformat_yyyymmdd
 from tools.logging import log
+import pandas as pd
+import datetime
 
 
 def is_panda_df_empty(panda_df):
@@ -28,20 +29,15 @@ def is_panda_df_empty(panda_df):
         raise AssertionError("No ValueError or AttributeError, but: " + str(e))
 
 
-# def date_dtype_must_be_corrected(df):
-#     """ make sure that column date has dtype("<M8[ns]") and not dtype('O') """
-#     # '<M8[ns]' = e.g. 2000-11-29
-#     # 'O' = can be e.g. 29-11-2000
-#
-#     if 'date' not in df.columns:
-#         return False
-#     elif df['date'].dtype == '<M8[ns]':
-#         return False
-#     elif df['date'].dtype == 'O':
-#         return True
-#     else:
-#         unknown_dtype = df['date'].dtype
-#         raise AssertionError(f"column date has weird dtype: {unknown_dtype}")
+def detect_dateformat(df):
+    possible_formats = ["%d/%m/%Y", "%Y-%m-%d"]
+    for date_format in possible_formats:
+        try:
+            pd.to_datetime(df["date"], format=date_format, errors="raise")
+            return date_format
+        except Exception:
+            pass
+    raise AssertionError("date format not recognized")
 
 
 def ensure_corect_date_format(df):
@@ -53,12 +49,12 @@ def ensure_corect_date_format(df):
         test = df["date"][1]
     except Exception:
         return df
-    date_string = df["date"].astype(str)
-    expected = df["date"].dt.strftime(dateformat_yyyymmdd)
-    if (date_string == expected).all():
-        return df
-    # we need to convert date to format yyyy-mm-dd
-    df["date"] = expected
+    # date_string = df["date"].astype(str)
+    date_format_detected = detect_dateformat(df)
+    date = pd.to_datetime(df["date"], format=date_format_detected, errors="ignore")
+    # we need to convert date to format yyyy-mm-dd (in string format since we will
+    # save to .csv
+    df["date"] = date.astype(str)
     return df
 
 

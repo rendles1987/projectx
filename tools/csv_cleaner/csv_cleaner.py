@@ -77,7 +77,7 @@ class BaseCsvCleaner:
         ].index
         # update df[column_name] to np.Nan if index is not in http_index
         self.dataframe[column_name][~self.dataframe.index.isin(http_index)] = np.NAN
-        pd.options.mode.chained_assignment = 'warn'  # default='warn'
+        pd.options.mode.chained_assignment = "warn"  # default='warn'
 
     def check_table_contains_unknown(self):
         black_list = ["unkown", "unkwown", "ukwnown", "unknown"]
@@ -134,11 +134,11 @@ class BaseCsvCleaner:
         index_log_these_dates = log_these_dates.index.values
         # remove these rows from self.dataframe
         self.dataframe.drop(self.dataframe.index[index_log_these_dates], inplace=True)
-        msg = 'date out of logic range'
+        msg = "date out of logic range"
         self.add_to_invalid_df(log_these_dates, msg)
 
     def add_to_invalid_df(self, df_wrong, msg):
-        df_wrong['msg'] = msg
+        df_wrong["msg"] = msg
         if is_panda_df_empty(self.dataframe_invalid):
             self.dataframe_invalid = df_wrong
         else:
@@ -195,6 +195,8 @@ class BaseCsvCleaner:
             ]
             log.error(f"more home goals than expected: {str(wrong_home_score.values)}")
             raise
+        if not all(home_score.astype(int) == self.dataframe["home_goals"]):
+            raise AssertionError("home_goals does not match score")
 
     def _check_score_format_away(self, column_name):
         """ number of goals away in """
@@ -206,6 +208,8 @@ class BaseCsvCleaner:
             ]
             log.error(f"more away goals than expected: {str(wrong_away_score.values)}")
             raise
+        if not all(away_score.astype(int) == self.dataframe["away_goals"]):
+            raise AssertionError("away_goals does not match score")
 
     def check_score_format(self):
         """ - this string must be 3 chars long e.g "3:5"
@@ -222,12 +226,11 @@ class BaseCsvCleaner:
                 f"{str(wrong_score_format.values)}"
             )
             raise
-
         self._check_score_format_home(column_name)
         self._check_score_format_away(column_name)
 
     def check_score_logic(self):
-        pass
+        raise NotImplementedError
 
     def save_changes(self):
         """ remove orig file and save self.dataframe to orig file filepath """
@@ -237,8 +240,10 @@ class BaseCsvCleaner:
     def save_df_invalid(self):
         if is_panda_df_empty(self.dataframe_invalid):
             return
-        dir_full_path = self.csv_file_full_path.rstrip(self.csv_file_name_with_extension)
-        filename = self.csv_file_name_without_extension + '_invalid.csv'
+        dir_full_path = self.csv_file_full_path.rstrip(
+            self.csv_file_name_with_extension
+        )
+        filename = self.csv_file_name_without_extension + "_invalid.csv"
         csv_file_full_path = os.path.join(dir_full_path, filename)
         df_to_csv(self.dataframe_invalid, csv_file_full_path)
 
@@ -260,6 +265,59 @@ class CupCsvCleaner(BaseCsvCleaner):
         self.properties = CUP_GAME_PROPERTIES
         self.max_goals = GAME_SPECS.cup_max_goals
 
+    def fix_aet(self):
+        """ update column aet. In the raw .csvs either aet is True of pso is True.
+        I assume that is pso is True, then aet is True (only penalties after extra time)
+        """
+        self.dataframe["aet"] = (self.dataframe["aet"] == True) | (
+            self.dataframe["pso"] == True
+        )
+
+    def check_score_logic(self):
+        """ check logic of 7 columns: 1) score_45, 2) score_90, 3) score_105,
+        4) score_120, 5) aet = (bool) AfterExtraTime, 6) pso = (bool) PenaltyShootOut
+        checks:
+        1 score_45 cannot be NA
+        2 if score_90 is not NA, then aet must be True
+        3 if score_105 is not NA, then score_90 cannot be NA
+        4 if score_120 is not NA, then score_105 cannot be NA <-- when does it happen?
+        5 if aet is True, then score_90 cannot be NA
+        6 if pso is True, then score_105 cannot be NA
+        """
+        self.fix_aet()
+
+        # check1
+        assert (self.dataframe["score_45"].isna().sum() == 0, "check1 failed")
+
+        # check2 (true if score_90 is not NA) & (true if aet is false) > wrong is True
+        mask = (~(self.dataframe["score_90"].isna())) & (self.dataframe["aet"] == False)
+        # if 1 or more True in mask then raise assertionerror
+        assert (mask.any() is False, "check2 failed")
+
+        # check3
+        mask = (~(self.dataframe["score_105"].isna())) & (
+            self.dataframe["score_90"].isna()
+        )
+        # if 1 or more True in mask then raise assertionerror
+        assert (mask.any() is False, "check3 failed")
+
+        # check4
+        mask = (~(self.dataframe["score_120"].isna())) & (
+            self.dataframe["score_105"].isna()
+        )
+        # if 1 or more True in mask then raise assertionerror
+        assert (mask.any() is False, "check4 failed")
+
+        # check5
+        mask = (self.dataframe["aet"] == True) & (self.dataframe["score_90"].isna())
+        # if 1 or more True in mask then raise assertionerror
+        assert (mask.any() is False, "check5 failed")
+
+        # check6
+        mask = (self.dataframe["pso"] == True) & (self.dataframe["score_105"].isna())
+        # if 1 or more True in mask then raise assertionerror
+        assert (mask.any() is False, "check6 failed")
+
 
 class LeagueCsvCleaner(BaseCsvCleaner):
     def __init__(self, csvfilepath):
@@ -267,6 +325,9 @@ class LeagueCsvCleaner(BaseCsvCleaner):
         self.csv_type = "cup"
         self.properties = LEAGUE_GAME_PROPERTIES
         self.max_goals = GAME_SPECS.league_max_goals
+
+    def check_score_logic(self):
+        pass
 
 
 class PlayerCsvCleaner(BaseCsvCleaner):
