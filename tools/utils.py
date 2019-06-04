@@ -1,6 +1,6 @@
 import os
 
-from tools.constants import dateformat_yyymmdd
+from tools.constants import dateformat_yyyymmdd
 from tools.logging import log
 
 
@@ -45,17 +45,16 @@ def is_panda_df_empty(panda_df):
 
 
 def ensure_corect_date_format(df):
-    """ panda datetime format is '2016-01-26' (yyyy-mm-dd) with dtype <M8[ns]
-    We can change format to e.g. (dd/mm/yyyy), but then we get dtype string which we do
-    not want. So lets ensure keep 1 date format thoughout whole project
-    """
+    """ the aim is to keep 1 date format throughout whole project because when saving
+    to .csv dtype becomes string. lets convert these strings to same format as
+    panda datetime format is '2016-01-26' (yyyy-mm-dd). """
     # first check if a 'date' column exists
     try:
         test = df["date"][1]
     except Exception:
         return df
     date_string = df["date"].astype(str)
-    expected = df["date"].dt.strftime(dateformat_yyymmdd)  # TODO: put this in constants
+    expected = df["date"].dt.strftime(dateformat_yyyymmdd)
     if (date_string == expected).all():
         return df
     # we need to convert date to format yyyy-mm-dd

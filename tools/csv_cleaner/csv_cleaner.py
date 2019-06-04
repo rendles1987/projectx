@@ -9,7 +9,7 @@ from tools.constants import (
     LEAGUE_GAME_PROPERTIES,
     PLAYER_PROPERTIES,
     SEASON_WINDOW,
-    dateformat_yyymmdd,
+    dateformat_yyyymmdd,
 )
 from tools.logging import log
 from tools.utils import df_to_csv, is_panda_df_empty
@@ -21,6 +21,7 @@ class BaseCsvCleaner:
         self.csv_file_full_path = csvfilepath
         self.properties = BASE_GAME_PROPERTIES
         self._dataframe = None
+        self._dataframe_invalid = None
         self.max_goals = None
 
     @property
@@ -48,6 +49,14 @@ class BaseCsvCleaner:
     def dataframe(self, dataframe):
         self._dataframe = dataframe
 
+    @property
+    def dataframe_invalid(self):
+        return self._dataframe_invalid
+
+    @dataframe_invalid.setter
+    def dataframe_invalid(self, dataframe):
+        self._dataframe_invalid = dataframe
+
     def check_replace_empty_strings_with_nan(self):
         """ replace all columns that are empty (e.g. 1. "''", 2. "' '", 3. "[]",
         4. "[ ]", with np.NAN """
@@ -71,7 +80,7 @@ class BaseCsvCleaner:
         pd.options.mode.chained_assignment = 'warn'  # default='warn'
 
     def check_table_contains_unknown(self):
-        black_list = ["unkown", "unkwown", "ukwnown"]  # , "unknown"]
+        black_list = ["unkown", "unkwown", "ukwnown", "unknown"]
         for black_string in black_list:
             # only loop trough string columns
             for column in self.dataframe.select_dtypes(include="O"):
@@ -86,7 +95,7 @@ class BaseCsvCleaner:
                 self.dataframe[column][self.dataframe.index.isin(wrong_idx)] = np.NAN
 
     def get_season(self, url_string):
-        """ get it, but also check it """
+        """ get season (int) from the url_string and also check it """
         """ >>> str = "h3110 23 cat 444.4 rabbit 11 2 dog"
             >>> [int(s) for s in str.split() if s.isdigit()]
             [23, 11, 2] """
@@ -103,24 +112,37 @@ class BaseCsvCleaner:
         season = min(digits)
         return season
 
-    def handle_fail_dates(self, fail_dates):
-        if len(fail_dates) == 0:
+    def handle_fail_dates(self, df_fail_dates):
+        if len(df_fail_dates) == 0:
             return
 
         # all fail_dates['season'] should be np.NAN otherwise there is problem
-        if fail_dates["season"].isna().all():
+        if df_fail_dates["season"].isna().all():
             # no problem, so return ('season' is np.NAN (since url is np.NAN))
             return
 
         # now we have a problem: season is not np.NAN and based on that a start- and
         # end date was set. Apparently is df['date'] not in between start and end.
         # Now get only those from fail_dates
-        log_these_dates = fail_dates[~fail_dates["season"].isna()]
+        log_these_dates = df_fail_dates[~df_fail_dates["season"].isna()]
         log.error(
             f"date out of logic range {self.csv_file_name_without_extension} "
             f"dates are: {log_these_dates}"
         )
-        raise  # TODO: shouldn't raise here, but log it or put in another source.. ?
+
+        # index in self.dataframe
+        index_log_these_dates = log_these_dates.index.values
+        # remove these rows from self.dataframe
+        self.dataframe.drop(self.dataframe.index[index_log_these_dates], inplace=True)
+        msg = 'date out of logic range'
+        self.add_to_invalid_df(log_these_dates, msg)
+
+    def add_to_invalid_df(self, df_wrong, msg):
+        df_wrong['msg'] = msg
+        if is_panda_df_empty(self.dataframe_invalid):
+            self.dataframe_invalid = df_wrong
+        else:
+            self.dataframe_invalid.append(df_wrong, ignore_index=True)
 
     def check_date_in_range(self):
         """ get date from column url. For league csv we can also use date in
@@ -133,7 +155,7 @@ class BaseCsvCleaner:
         self.dataframe["season"] = self.dataframe["url"].apply(self.get_season)
 
         try:
-            date = pd.to_datetime(self.dataframe["date"], format=dateformat_yyymmdd)
+            date = pd.to_datetime(self.dataframe["date"], format=dateformat_yyyymmdd)
         except:
             raise AssertionError(
                 "date format fail.. this should have been fixed in "
@@ -158,10 +180,11 @@ class BaseCsvCleaner:
         )
         # get dates that are not between start and end (if season = np.NAN, then
         # start_date and end_date are also np.NAN and that row will be selected here
-        fail_dates = self.dataframe[
+        df_fail_dates = self.dataframe[
             ~date.between(start_date, end_date, inclusive=False)
         ]
-        self.handle_fail_dates(fail_dates)
+        if not is_panda_df_empty(df_fail_dates):
+            self.handle_fail_dates(df_fail_dates)
 
     def _check_score_format_home(self, column_name):
         # dtype becomes now object
@@ -211,6 +234,14 @@ class BaseCsvCleaner:
         os.remove(self.csv_file_full_path)
         df_to_csv(self.dataframe, self.csv_file_full_path)
 
+    def save_df_invalid(self):
+        if is_panda_df_empty(self.dataframe_invalid):
+            return
+        dir_full_path = self.csv_file_full_path.rstrip(self.csv_file_name_with_extension)
+        filename = self.csv_file_name_without_extension + '_invalid.csv'
+        csv_file_full_path = os.path.join(dir_full_path, filename)
+        df_to_csv(self.dataframe_invalid, csv_file_full_path)
+
     def run(self):
         self.check_replace_empty_strings_with_nan()
         self.check_white_list_url()
@@ -219,6 +250,7 @@ class BaseCsvCleaner:
         self.check_score_format()
         self.check_score_logic()
         self.save_changes()
+        self.save_df_invalid()
 
 
 class CupCsvCleaner(BaseCsvCleaner):

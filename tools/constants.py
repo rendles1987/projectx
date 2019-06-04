@@ -1,6 +1,6 @@
 from collections import namedtuple
 
-dateformat_yyymmdd = "%Y-%m-%d"
+dateformat_yyyymmdd = "%Y-%m-%d"
 
 RAW_CSV_DIRS = {
     "cup": "/work/data/temp_stuff/_01_raw/cup",
