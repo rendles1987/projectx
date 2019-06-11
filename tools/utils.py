@@ -1,8 +1,9 @@
+import datetime
 import os
+
+import pandas as pd
 from tools.constants import dateformat_yyyymmdd
 from tools.logging import log
-import pandas as pd
-import datetime
 
 
 def is_panda_df_empty(panda_df):
@@ -45,11 +46,8 @@ def ensure_corect_date_format(df):
     to .csv dtype becomes string. lets convert these strings to same format as
     panda datetime format is '2016-01-26' (yyyy-mm-dd). """
     # first check if a 'date' column exists
-    try:
-        test = df["date"][1]
-    except Exception:
+    if not "date" in df.columns:
         return df
-    # date_string = df["date"].astype(str)
     date_format_detected = detect_dateformat(df)
     date = pd.to_datetime(df["date"], format=date_format_detected, errors="ignore")
     # we need to convert date to format yyyy-mm-dd (in string format since we will

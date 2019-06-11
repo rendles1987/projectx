@@ -19,6 +19,8 @@ from tools.csv_importer.raw_csv_importer import (
     fix_nan_values,
     remove_tab_strings,
 )
+from tools.csv_merger.csv_enricher import CupCsvEnricher, LeagueCsvEnricher
+from tools.csv_merger.csv_merger import MergeCsvToSqlite
 from tools.logging import log
 
 
@@ -64,6 +66,12 @@ class ProcessController:
         log.info("check if 1 or more raw data files exists")
         raw_csv_info = RawCsvInfo()
         assert len(raw_csv_info.csv_info) > 0
+
+    @staticmethod
+    def check_clean_data_exists():
+        log.info("check if 1 or more clean data files exists")
+        clean_csv_info = CleanCsvInfo()
+        assert len(clean_csv_info.csv_info) > 0
 
     @staticmethod
     def check_valid_import_data_exists():
@@ -192,13 +200,10 @@ class ProcessController:
             if csv_type == "league":
                 league_importer = LeagueCsvImporter(csv_file_path)
                 league_importer.run()
-            # # TODO: enable also cup and player!
             if csv_type == "cup":
                 cup_importer = CupCsvImporter(csv_file_path)
                 cup_importer.run()
-            # elif csv_type == "player":
-            #     player_importer = PlayerCsvImporter(csv_file_path)
-            #     player_importer.run()
+            # TODO: enable also cup and player!
 
     def clean(self):
         log.info("clean csv_data")
@@ -211,9 +216,24 @@ class ProcessController:
                 cup_cleaner = CupCsvCleaner(csv_file_path)
                 cup_cleaner.run()
             # TODO: enable also cup and player!
-            # elif csv_type == "player":
-            #     player_cleaner = PlayerCsvCleaner(csv_file_path)
-            #     player_cleaner.run()
+
+    def enrich(self):
+        log.info("enrich clean csv_data")
+        clean_csv_info = CleanCsvInfo()
+        for csv_type, csv_file_path in clean_csv_info.csv_info:
+            if csv_type == "league":
+                league_enricher = LeagueCsvEnricher(csv_file_path)
+                league_enricher.run()
+            elif csv_type == "cup":
+                league_enricher = CupCsvEnricher(csv_file_path)
+                league_enricher.run()
+            # TODO: enable also cup and player!
+
+    def merge(self):
+        log.info("merge clean csv_data")
+        clean_csv_info = CleanCsvInfo()
+        merger = MergeCsvToSqlite(clean_csv_info)
+        merger.run()
 
     def link_players(self):
         pass
@@ -251,11 +271,11 @@ class ProcessController:
         self.copy_valid_import_to_clean()
         self.clean()
 
-    def do_enrich(self):
-        """ from here on no .csv anymore, but to sqlite3 """
-        self.link_players()
-        self.travel_distance()
-        self.data_adaption_2()
+    def do_merge(self):
+        """Before we merge all csvs to sqlite, we add columns 1) game_type,
+        2) game_name, 3) season """
+        self.enrich()
+        self.merge()
 
     def do_ml(self):
         self.run_ml()
@@ -264,6 +284,7 @@ class ProcessController:
         # self.do_scrape()  # scrap data (webpage --> raw)
         self.do_import()  # import raw data (raw --> import)
         self.do_clean()  # clean data (import --> clean)
+        self.do_merge()  # add 2 or 3 columns to clean and then merge to sqlite
         # self.do_enrich()  # enrich data (clean --> enrich)
         # self.do_ml()
         log.info("shutting down")

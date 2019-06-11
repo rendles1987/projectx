@@ -44,12 +44,12 @@ def check_nan_fix_required(csv_path):
         if contains_true:
             nr_true = values[keys.index("True")]
         if contains_nan:
-            nr_nan = nr_rows - temp_df.count()
+            nr_nan = nr_rows - temp_df[column].count()
         nr_bool = nr_false + nr_true
 
         if nr_rows - (nr_bool + nr_nan) > 0:
-            # column includes a leftover (no boolean, no nan, but another string?
-            # we need to fix this,
+            # column includes a leftover: no boolean, no nan, but another string?
+            # we need to fix this, so nan_fix_required = True
             return True
     return False
 
@@ -335,7 +335,10 @@ class BaseCsvImporter:
             df_to_csv(invalid_df, full_path)
 
         if count_valid_rows > 0:
-            log.info(f"create valid (and converted) df with {count_valid_rows} rows")
+            log.info(
+                f"{self.csv_file_name_without_extension} create valid (and "
+                f"converted) df with {count_valid_rows} rows"
+            )
             valid_df = check_results.get_valid_df(
                 df_selection, self.clm_desired_dtype_dict
             )
