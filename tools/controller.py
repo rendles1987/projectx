@@ -23,6 +23,8 @@ from tools.csv_merger.csv_enricher import CupCsvEnricher, LeagueCsvEnricher
 from tools.csv_merger.csv_merger import MergeCsvToSqlite
 from tools.logging import log
 
+from tools.sqlite_teams.teams_unique import TeamsUnique
+
 
 class ProcessController:
     def __init__(self):
@@ -203,19 +205,18 @@ class ProcessController:
             if csv_type == "cup":
                 cup_importer = CupCsvImporter(csv_file_path)
                 cup_importer.run()
-            # TODO: enable also cup and player!
 
     def clean(self):
         log.info("clean csv_data")
         clean_csv_info = CleanCsvInfo()
         for csv_type, csv_file_path in clean_csv_info.csv_info:
+            log.info(f"clean csv_data {csv_file_path}")
             if csv_type == "league":
                 league_cleaner = LeagueCsvCleaner(csv_file_path)
                 league_cleaner.run()
             elif csv_type == "cup":
                 cup_cleaner = CupCsvCleaner(csv_file_path)
                 cup_cleaner.run()
-            # TODO: enable also cup and player!
 
     def enrich(self):
         log.info("enrich clean csv_data")
@@ -227,13 +228,16 @@ class ProcessController:
             elif csv_type == "cup":
                 league_enricher = CupCsvEnricher(csv_file_path)
                 league_enricher.run()
-            # TODO: enable also cup and player!
 
     def merge(self):
         log.info("merge clean csv_data")
         clean_csv_info = CleanCsvInfo()
         merger = MergeCsvToSqlite(clean_csv_info)
         merger.run()
+
+    def create_unique_teams(self):
+        unique_teams = TeamsUnique()
+        unique_teams.run()
 
     def link_players(self):
         pass
@@ -277,14 +281,18 @@ class ProcessController:
         self.enrich()
         self.merge()
 
+    def determine_teams(self):
+        """ from here all happens in sqlite"""
+        self.create_unique_teams()
+
     def do_ml(self):
         self.run_ml()
 
     def run(self):
         # self.do_scrape()  # scrap data (webpage --> raw)
-        self.do_import()  # import raw data (raw --> import)
-        self.do_clean()  # clean data (import --> clean)
-        self.do_merge()  # add 2 or 3 columns to clean and then merge to sqlite
-        # self.do_enrich()  # enrich data (clean --> enrich)
+        # self.do_import()  # import raw data (raw --> import)
+        # self.do_clean()  # clean data (import --> clean)
+        # self.do_merge()  # add 2 or 3 columns to clean and then merge to sqlite
+        self.determine_teams()
         # self.do_ml()
         log.info("shutting down")

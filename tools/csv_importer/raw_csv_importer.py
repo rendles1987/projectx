@@ -124,7 +124,6 @@ def fix_nan_values(csv_path):
     for row_idx, row in enumerate(
         pd.read_csv(csv_path, sep=delimiter_type, skiprows=0, chunksize=1)
     ):
-
         log.info("fix_nan_values row_index: " + str(row_idx))
 
         shift_right = 0
@@ -171,11 +170,109 @@ def fix_nan_values(csv_path):
         else:
             new_df = pd.concat([new_df, row_copy], ignore_index=True)
 
+    fix_needed, index_wrong = fix_needed_players_sheets_in_one_column(new_df)
+    if fix_needed:
+        new_df = fix_players_sheets(new_df, csv_path, index_wrong)
+
     # remove columns with "unnamed" in header
     unnamed_columns = [clm for clm in new_df.columns if "unnamed" in clm.lower()]
     new_df.drop(unnamed_columns, axis=1, inplace=True)
     os.remove(csv_path)
     df_to_csv(new_df, csv_path)
+
+
+def fix_players_sheets(new_df, csv_path, index_wrong):
+    delimiter_type = detect_delimeter_type(csv_path)
+
+    index_wrong_list = index_wrong.to_list()
+
+    for row_idx, row in enumerate(
+        pd.read_csv(csv_path, sep=delimiter_type, skiprows=0, chunksize=1)
+    ):
+        if row_idx not in index_wrong_list:
+            continue
+
+        log.warning(f"fix player sheet row_idx {row_idx}")
+
+        # sometimes players are in seperate columns...
+        # luckly enough I only put brackets around playersheets, so:
+        # - detect first column with '[' in it
+        # - detect first column with ']' in it
+        # - detect second column with '[' in it
+        # - detect second column with ']' in it
+
+        bracket_open_first = None
+        bracket_open_second = None
+        bracket_close_first = None
+        bracket_close_second = None
+
+        # loop though columns
+        for clm_idx, clm in enumerate(row.columns):
+            if str(row[clm].values).count("[") == 2:
+                if not bracket_open_first:
+                    bracket_open_first = clm_idx
+                else:
+                    if bracket_open_second:
+                        raise AssertionError("found too many [")
+                    bracket_open_second = clm_idx
+            if str(row[clm].values).count("]") == 2:
+                if not bracket_close_first:
+                    bracket_close_first = clm_idx
+                else:
+                    if bracket_close_second:
+                        raise AssertionError("found too many ]")
+                    bracket_close_second = clm_idx
+
+        if not bracket_open_second or not bracket_close_second:
+            raise AssertionError(f"{csv_path} could not find last column with bracket")
+
+        # dataFrame.loc[<ROWS RANGE> , <COLUMNS RANGE>]
+        home_df = row.iloc[:, bracket_open_first : bracket_close_first + 1]
+        if is_panda_df_empty(home_df):
+            raise AssertionError("wtf, why home_df empty")
+        away_df = row.iloc[:, bracket_open_second : bracket_close_second + 1]
+        if is_panda_df_empty(away_df):
+            raise AssertionError("wtf, why away_df empty")
+
+        # merge df to 1 column
+        home_merged = home_df.to_string(header=False, index=False)
+        home_merged = home_merged.replace("   ", ",")
+        home_merged = home_merged.replace("[,", "[")
+        home_merged = home_merged.replace(",]", "]")
+
+        away_merged = away_df.to_string(header=False, index=False)
+        away_merged = away_merged.replace("   ", ",")
+        away_merged = away_merged.replace("[,", "[")
+        away_merged = away_merged.replace(",]", "]")
+
+        # update new_df
+        new_df.at[row_idx, "home_sheet"] = home_merged
+        new_df.at[row_idx, "away_sheet"] = away_merged
+
+    return new_df
+
+
+def fix_needed_players_sheets_in_one_column(new_df):
+    # before we trough away the old csv, first check if column home_sheet and away_sheet are filled proper
+    # - we assume minimal length of 100 chars
+    # - only check if url startswith 'hhtp'
+    min_len_sheet_string = 100
+    mask_homesheet_too_short = (
+        (new_df["home_sheet"].str.len() < min_len_sheet_string)
+        & (new_df["home_sheet"] != "[]")
+        & (new_df["url"].str.startswith("http"))
+    )
+    mask_awaysheet_too_short = (
+        (new_df["away_sheet"].str.len() < min_len_sheet_string)
+        & (new_df["away_sheet"] != "[]")
+        & (new_df["url"].str.startswith("http"))
+    )
+
+    both_mask = mask_homesheet_too_short + mask_awaysheet_too_short
+    if both_mask.any():  # if any true, then fix is needed
+        index_true = both_mask[both_mask == True].index
+        return True, index_true
+    return False, None
 
 
 def check_properties(props, orig_df_columns, csv_full_path):

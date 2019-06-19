@@ -3,48 +3,48 @@ from collections import namedtuple
 dateformat_yyyymmdd = "%Y-%m-%d"
 
 
-RAW_CSV_DIRS = {
-    "cup": "/work/data/temp_stuff/_01_raw/cup",
-    "league": "/work/data/temp_stuff/_01_raw/league",
-    "player": "/work/data/temp_stuff/_01_raw/player",
-}
-
-IMPORT_CSV_DIRS = {
-    "cup": "/work/data/temp_stuff/_02_import/cup",
-    "league": "/work/data/temp_stuff/_02_import/league",
-    "player": "/work/data/temp_stuff/_02_import/player",
-}
-
-
-CLEAN_CSV_DIRS = {
-    "cup": "/work/data/temp_stuff/_03_clean/cup",
-    "league": "/work/data/temp_stuff/_03_clean/league",
-    "player": "/work/data/temp_stuff/_03_clean/player",
-}
-
-MERGE_CSV_DIR = "/work/data/temp_stuff/_04_merge/"
-
-
 # RAW_CSV_DIRS = {
-#     "cup": "/work/data/_01_raw/cup",
-#     "league": "/work/data/_01_raw/league",
-#     "player": "/work/data/_01_raw/player",
+#     "cup": "/work/data/temp_stuff/_01_raw/cup",
+#     "league": "/work/data/temp_stuff/_01_raw/league",
+#     "player": "/work/data/temp_stuff/_01_raw/player",
 # }
 #
 # IMPORT_CSV_DIRS = {
-#     "cup": "/work/data/_02_import/cup",
-#     "league": "/work/data/_02_import/league",
-#     "player": "/work/data/_02_import/player",
+#     "cup": "/work/data/temp_stuff/_02_import/cup",
+#     "league": "/work/data/temp_stuff/_02_import/league",
+#     "player": "/work/data/temp_stuff/_02_import/player",
 # }
 #
 #
 # CLEAN_CSV_DIRS = {
-#     "cup": "/work/data/_03_clean/cup",
-#     "league": "/work/data/_03_clean/league",
-#     "player": "/work/data/_03_clean/player",
+#     "cup": "/work/data/temp_stuff/_03_clean/cup",
+#     "league": "/work/data/temp_stuff/_03_clean/league",
+#     "player": "/work/data/temp_stuff/_03_clean/player",
 # }
 #
-# MERGE_CSV_DIR = "/work/data/_04_merge/"
+# MERGE_CSV_DIR = "/work/data/temp_stuff/_04_merge/"
+
+
+RAW_CSV_DIRS = {
+    "cup": "/work/data/_01_raw/cup",
+    "league": "/work/data/_01_raw/league",
+    "player": "/work/data/_01_raw/player",
+}
+
+IMPORT_CSV_DIRS = {
+    "cup": "/work/data/_02_import/cup",
+    "league": "/work/data/_02_import/league",
+    "player": "/work/data/_02_import/player",
+}
+
+
+CLEAN_CSV_DIRS = {
+    "cup": "/work/data/_03_clean/cup",
+    "league": "/work/data/_03_clean/league",
+    "player": "/work/data/_03_clean/player",
+}
+
+MERGE_CSV_DIR = "/work/data/_04_merge/"
 
 
 TEMP_DIR = "/work/data/tmp"

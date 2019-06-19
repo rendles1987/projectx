@@ -1,22 +1,28 @@
 import os
 import sqlite3
-
+import logging
 import pandas as pd
 from tools.constants import MERGE_CSV_DIR
+
+log = logging.getLogger(__name__)
+
+SQLITE_NAME = "my_sqlite.db"
+SQLITE_FULL_PATH = MERGE_CSV_DIR + SQLITE_NAME
 
 
 class MergeCsvToSqlite:
     def __init__(self, clean_csv_info):
+        log.info(f"start {self.__class__.__name__}")
         self.clean_csv_info = clean_csv_info
-        self.sqlite_name = "my_sqlite.db"
-        self.sqlite_full_path = MERGE_CSV_DIR + self.sqlite_name
 
     def run(self):
-        if os.path.isfile(self.sqlite_full_path):
-            os.remove(self.sqlite_full_path)
+        if os.path.isfile(SQLITE_FULL_PATH):
+            log.debug(f"deleting {SQLITE_FULL_PATH}")
+            os.remove(SQLITE_FULL_PATH)
         """ for now, we always create new sqlite with tables: cup, league, player """
         # Opens file if exists, else creates file
-        connex = sqlite3.connect(self.sqlite_full_path)
+        log.debug(f"connect to {SQLITE_FULL_PATH}")
+        connex = sqlite3.connect(SQLITE_FULL_PATH)
         # This object lets us actually send messages to our DB and receive results
         # cur = connex.cursor()
 

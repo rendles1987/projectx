@@ -15,6 +15,7 @@ from tools.logging import log
 from tools.utils import df_to_csv, is_panda_df_empty
 from tools.csv_importer.filename_checker import LeagueFilenameChecker
 
+
 class BaseCsvCleaner:
     def __init__(self, csvfilepath):
         self.csv_type = None
@@ -69,6 +70,7 @@ class BaseCsvCleaner:
 
     def check_white_list_url(self):
         """ url may only contain 'http'/'https' or np.Nan"""
+        log.debug(f"check white list url {self.csv_file_name_without_extension}")
         pd.options.mode.chained_assignment = None  # default='warn'
         column_name = "url"
         # create Int64Index: select indices where df[column_name] startswith 'http'
@@ -80,6 +82,9 @@ class BaseCsvCleaner:
         pd.options.mode.chained_assignment = "warn"  # default='warn'
 
     def check_table_contains_unknown(self):
+        log.debug(
+            f"check_table_contains_unknown {self.csv_file_name_without_extension}"
+        )
         black_list = ["unkown", "unkwown", "ukwnown", "unknown"]
         for black_string in black_list:
             # only loop trough string columns
@@ -112,6 +117,8 @@ class BaseCsvCleaner:
                 f"{self.csv_file_name_with_extension} I expect "
                 f"{url_string} to have season ints"
             )
+        if len(digits) > 2:
+            return np.NAN
         season = min(digits)
         return season
 
@@ -187,6 +194,8 @@ class BaseCsvCleaner:
     def check_date_in_range(self):
         """ get date from column url. For league csv we can also use date in
         filename to verify date """
+        log.debug(f"check_date_in_range {self.csv_file_name_without_extension}")
+
         assert (
             not self.dataframe["date"].isna().all(),
             "I expect 'date' column does not include any np.NAN",
@@ -224,19 +233,21 @@ class BaseCsvCleaner:
             ~date.between(start_date, end_date, inclusive=True)
         ]
 
-        # TODO delete this "self.tmp_check()"
-        self.tmp_check(df_fail_dates)
+        df_fail_dates_season_not_nan = df_fail_dates[~df_fail_dates["season"].isna()]
+        if not is_panda_df_empty(df_fail_dates_season_not_nan):
+            raise AssertionError(
+                f"{self.csv_file_name_without_extension} We expect that df_fail_dates "
+                f"does not include fails as results of season is nan"
+            )
 
         if not is_panda_df_empty(df_fail_dates):
             self.handle_fail_dates(df_fail_dates)
 
-    def tmp_check(self, df_fail_dates):
-        # TODO: once you filled column season (by filename and url), then you delete
-        # this tmp_check
+    def _check(self, df_fail_dates):
         df_fail_dates_season_not_nan = df_fail_dates[~df_fail_dates["season"].isna()]
         if not is_panda_df_empty(df_fail_dates_season_not_nan):
             raise AssertionError(
-                "trouble..  date not in range even if we neglect " "season is nan rows"
+                "We expect that df_fail_dates does not include fails as results of season is nan "
             )
 
     def _check_score_format_home(self, column_name):
@@ -276,6 +287,8 @@ class BaseCsvCleaner:
     def check_score_format(self):
         """ - this string must be 3 chars long e.g "3:5"
             - field must contain 1 digit int, a colon (:), and 1 digit int"""
+        log.debug(f"check_score_format {self.csv_file_name_without_extension}")
+
         column_name = "score"
 
         # max one ":" per score cell
@@ -300,6 +313,170 @@ class BaseCsvCleaner:
     def check_score_logic(self):
         raise NotImplementedError
 
+    def column_has_only_nan(self, column):
+        return column.isnull().values.all()
+
+    def check_sheet_format(self):
+        """
+        - home_sheet and away_sheet should start with '['
+        - home_sheet and away_sheet should end with ']'
+        - if wrong? drop from df and add_to_invalid_df()
+        :return:
+        """
+        column_name = "home_sheet"
+        # if cell is nan, then incorrect_start is False. Why? As ~(na=True) returns False
+
+        if self.column_has_only_nan(self.dataframe[column_name]):
+            incorrect_start = self.dataframe[column_name].notna()
+            incorrect_end = self.dataframe[column_name].notna()
+        else:
+            incorrect_start = ~self.dataframe[column_name].str.startswith("[", na=True)
+            incorrect_end = ~self.dataframe[column_name].str.endswith("]", na=True)
+        mask_home_merge = incorrect_start + incorrect_end
+
+        column_name = "away_sheet"
+        if self.column_has_only_nan(self.dataframe[column_name]):
+            incorrect_start = self.dataframe[column_name].notna()
+            incorrect_end = self.dataframe[column_name].notna()
+        else:
+            incorrect_start = ~self.dataframe[column_name].str.startswith("[", na=True)
+            incorrect_end = ~self.dataframe[column_name].str.endswith("]", na=True)
+        mask_away_merge = incorrect_start + incorrect_end
+
+        mask_all = mask_home_merge + mask_away_merge
+
+        if mask_all.any():
+            incorrect_bracket = self.dataframe[mask_all]
+            index_incorrect_bracket = mask_all[mask_all].index
+            index_incorrect_bracket = incorrect_bracket.index.values
+            msg = "home- or away sheet string doesnt start/end with bracket"
+            log.error(f"{msg} {self.csv_file_name_without_extension}")
+            # remove these rows from self.dataframe
+            self.dataframe.drop(
+                self.dataframe.index[index_incorrect_bracket], inplace=True
+            )
+            self.add_to_invalid_df(incorrect_bracket, msg)
+
+    def check_sheet_count(self):
+        """
+        - count number of players home_sheet
+        - count number of players away_sheet
+        """
+        if self.column_has_only_nan(self.dataframe["home_sheet"]):
+            nr_home_players = pd.Series([0])
+        else:
+            nr_home_players = self.dataframe["home_sheet"].str.count(",")
+
+        if self.column_has_only_nan(self.dataframe["away_sheet"]):
+            nr_away_players = pd.Series([0])
+        else:
+            nr_away_players = self.dataframe["away_sheet"].str.count(",")
+
+        mask_all = (nr_home_players > 11) | (nr_away_players > 11)
+        if mask_all.any():
+            df_too_many_players = self.dataframe[mask_all]
+            index_df_too_many_players = df_too_many_players.index.values
+            msg = "home- or away sheet has > 11 players"
+            log.error(f"{msg} {self.csv_file_name_without_extension}")
+            # remove these rows from self.dataframe
+            self.dataframe.drop(
+                self.dataframe.index[index_df_too_many_players], inplace=True
+            )
+            self.add_to_invalid_df(df_too_many_players, msg)
+
+    def check_sheets_intersection(self):
+        """ we distinguish 2 cases:
+        - 1: all 22 players must be unique
+        - 2: all 22 players + 2 managers names must be unique
+        :return:
+        """
+        # use the drop parameter to avoid the old index being added as a column
+        # self.dataframe.reset_index(drop=True)
+
+        home_only_nan = self.column_has_only_nan(self.dataframe["home_sheet"])
+        away_only_nan = self.column_has_only_nan(self.dataframe["away_sheet"])
+        if home_only_nan and away_only_nan:
+            return
+        if sum([home_only_nan, away_only_nan]):
+            raise AssertionError("until now, I expect both to be true or false")
+
+        home_players_lists = self.dataframe["home_sheet"].str.lstrip("[")
+        home_players_lists = home_players_lists.str.rstrip("]")
+
+        away_players_lists = self.dataframe["away_sheet"].str.lstrip("[")
+        away_players_lists = away_players_lists.str.rstrip("]")
+
+        home_players = home_players_lists.str.split(",", n=11, expand=True)  #
+        away_players = away_players_lists.str.split(",", n=11, expand=True)
+
+        # 1: all 22 players must be unique
+        # concat([10rows x 20col, 10rows x 15col]) becomes df of 10row x 35col
+        players = pd.concat([home_players, away_players], axis=1)
+        # row wise count (None is not included = good)
+        count_per_row = players.count(axis=1)
+        unique_per_row = players.nunique(axis=1)
+        mask_players_not_unique = count_per_row != unique_per_row
+        # get index of rows where players in home_sheet exists in away_sheet, or vice versa
+        index_players_not_unique = mask_players_not_unique[
+            mask_players_not_unique
+        ].index
+
+        # 2: all 22 players + 2 managers names must be unique
+        players_coaches = players
+        players_coaches["home_manager"] = self.dataframe["home_manager"]
+        players_coaches["away_manager"] = self.dataframe["away_manager"]
+        count_per_row = players_coaches.count(axis=1)
+        unique_per_row = players.nunique(axis=1)
+        mask_players_coaches_not_unique = count_per_row != unique_per_row
+        # get index of rows where managers exists in home_sheet or away_sheet
+        index_players_coaches_not_unique = mask_players_coaches_not_unique[
+            mask_players_coaches_not_unique
+        ].index
+
+        """
+        idx1 = pd.Index([2, 1, 3, 4])
+        idx2 = pd.Index([3, 4, 5, 6])
+        idx1.difference(idx2)
+        Int64Index([1, 2], dtype='int64')
+        idx2.difference(idx1)
+        Int64Index([5, 6], dtype='int64')
+        idx1.intersection(idx2)
+        Int64Index([3, 4], dtype='int64')
+        """
+
+        index_only_players_wrong = index_players_not_unique.difference(
+            index_players_coaches_not_unique
+        )
+        index_only_managers_wrong = index_players_coaches_not_unique.difference(
+            index_players_not_unique
+        )
+        index_both_wrong = index_players_not_unique.intersection(
+            index_players_coaches_not_unique
+        )
+
+        if len(index_only_players_wrong) > 0:
+            msg = "home- and away sheet not unique"
+            log.error(f"{msg} {self.csv_file_name_without_extension}")
+            df_only_players_wrong = self.dataframe.loc[index_both_wrong]
+            self.add_to_invalid_df(df_only_players_wrong, msg)
+        if len(index_only_managers_wrong) > 0:
+            msg = "managers are in home- or away_sheet"
+            log.error(f"{msg} {self.csv_file_name_without_extension}")
+            df_only_managers_wrong = self.dataframe.loc[index_both_wrong]
+            self.add_to_invalid_df(df_only_managers_wrong, msg)
+        if len(index_both_wrong) > 0:
+            msg = "home- and away sheet not unique AND managers in home- or away_sheet"
+            log.error(f"{msg} {self.csv_file_name_without_extension}")
+            df_both_wrong = self.dataframe.loc[index_both_wrong]
+            self.add_to_invalid_df(df_both_wrong, msg)
+
+        all_wrong_index = index_players_not_unique.union(
+            index_players_coaches_not_unique
+        )
+        if len(all_wrong_index) > 0:
+            # self.dataframe.drop(self.dataframe.index[all_wrong_index], inplace=True)
+            self.dataframe.drop(self.dataframe.loc[all_wrong_index].index, inplace=True)
+
     def save_changes(self):
         """ remove orig file and save self.dataframe to orig file filepath """
         os.remove(self.csv_file_full_path)
@@ -316,6 +493,7 @@ class BaseCsvCleaner:
         df_to_csv(self.dataframe_invalid, csv_file_full_path)
 
     def run(self):
+        log.debug(f"clean {self.csv_file_name_without_extension}")
         self.check_replace_empty_strings_with_nan()
         self.check_white_list_url()
         self.update_if_url_nan()
@@ -323,6 +501,9 @@ class BaseCsvCleaner:
         self.check_date_in_range()
         self.check_score_format()
         self.check_score_logic()
+        self.check_sheet_format()
+        self.check_sheet_count()
+        self.check_sheets_intersection()
         self.save_changes()
         self.save_df_invalid()
 
@@ -384,7 +565,9 @@ class CupCsvCleaner(BaseCsvCleaner):
             # check for intersection
             intersected_keys = index_true.intersection(index_msg_mapping)
             if intersected_keys.size > 0:
-                index_msg_mapping[intersected_keys].append(msg)
+                for key in intersected_keys:
+                    # value = existing string + msg
+                    index_msg_mapping[key] = index_msg_mapping[key] + ", " + msg
             new_keys = [elem for elem in index_true if elem not in index_msg_mapping]
             if new_keys:
                 new_dict = {elem: msg for elem in new_keys}
@@ -497,7 +680,7 @@ class CupCsvCleaner(BaseCsvCleaner):
             return
         # some score check(s) failed. First create invalid df and then remove these
         # rows from self.dataframe
-        df_log_these_scores = self.dataframe.iloc[list(index_msg_mapping)]
+        df_log_these_scores = self.dataframe.loc[list(index_msg_mapping)]
         df_log_these_scores["msg"] = ""
         # update msg column based on dictionary values
         df_log_these_scores.msg.update(pd.Series(index_msg_mapping))
@@ -525,13 +708,16 @@ class LeagueCsvCleaner(BaseCsvCleaner):
         if (self.dataframe["season"].isna()).any():
             season = LeagueFilenameChecker(self.csv_file_full_path).season
 
-            mask = (self.dataframe['season'] != season) & (
-                ~self.dataframe['season'].isna())  # problem? then true
+            mask = (self.dataframe["season"] != season) & (
+                ~self.dataframe["season"].isna()
+            )  # problem? then true
 
             if mask.any():
-                raise AssertionError(f'{self.csv_file_name_without_extension} '
-                                     f'season from "get_season_from_url()" differs '
-                                     f'from season based on filename')
+                raise AssertionError(
+                    f"{self.csv_file_name_without_extension} "
+                    f'season from "get_season_from_url()" differs '
+                    f"from season based on filename"
+                )
 
             self.dataframe["season"].fillna(season, inplace=True)
 
