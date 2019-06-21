@@ -4,6 +4,8 @@ import os
 import logging
 import sqlite3
 import pandas as pd
+from fuzzywuzzy import fuzz
+from fuzzywuzzy import process
 
 log = logging.getLogger(__name__)
 
@@ -81,6 +83,8 @@ class TeamsUnique:
         teams_known_country.drop_duplicates(inplace=True)
 
         unique_team_country = pd.concat([teams_known_country, teams_unknown_country])
+        unique_team_country.reset_index(drop=True, inplace=True)
+
         return unique_team_country
 
     def __get_unique_team_country(self, df):
@@ -117,23 +121,58 @@ class TeamsUnique:
 
         return df_team_country
 
-    def check_uniqueness(sefl, df_unique_team_country):
-        len_orig = len(df_unique_team_country)
-        len_unique = len(df_unique_team_country["team"].unique())
+    def check_uniqueness(self):
+        len_orig = len(self.df_unique_team_country)
+        len_unique = len(self.df_unique_team_country["team"].unique())
         assert len_orig == len_unique
 
-    def check_fuzzy_wuzzy(self, df_unique_team_country):
-        # http://jonathansoma.com/lede/algorithms-2017/classes/fuzziness-matplotlib/fuzzing-matching-in-pandas-with-fuzzywuzzy/
-        # fuzz is used to compare TWO strings
-        from fuzzywuzzy import fuzz
-        # process is used to compare a string to MULTIPLE other strings
-        from fuzzywuzzy import process
-        print("hoi")
-        pass
+    def get_processed_teams(self, teams):
+        processed_teams = []
+        for team in teams:
+            if team:
+                processed_team = fuzz._process_and_sort(team, True, True)
+                processed_teams.append({"processed": processed_team, "team": team})
+        processed_teams.sort(key=lambda x: len(x["processed"]))
+        return processed_teams
+
+    def find_matching_teams(self, processed_teams, upper_bound=0.85):
+        """Takes about 78 seconds for 2201 teams
+        https://codereview.stackexchange.com/questions/193567/string-similarity-
+        using-fuzzywuzzy-on-big-data
+        """
+        matching_teams = []
+        for idx, team in enumerate(processed_teams):
+            length_team = len(team["processed"])
+            matcher = fuzz.SequenceMatcher(None, team["processed"])
+            # we only compare team with teams that have longer string length (so from
+            # index idx+1 until end of processed_teams)
+            for idx2 in range(idx + 1, len(processed_teams)):
+                team2 = processed_teams[idx2]
+                length_team2 = len(team2["processed"])
+                # before we actually calc ratio with fuzz we compare string length
+                # minimal 85% of
+                if 2 * length_team / (length_team + length_team2) < upper_bound:
+                    break
+                matcher.set_seq2(team2["processed"])
+                if (
+                    matcher.quick_ratio() >= upper_bound
+                    and matcher.ratio() >= upper_bound
+                ):  # should also try without quick_ratio() check
+                    log.warning(
+                        f'found matching teams: {team["team"]}, {team2["team"]}'
+                    )
+                    matching_teams.append((team["team"], team2["team"]))
+        return matching_teams
+
+    def find_teams_alike(self):
+        teams = self.df_unique_team_country["team"].to_list()
+        processed_teams = self.get_processed_teams(teams)
+        matching_teams = self.find_matching_teams(processed_teams)
+        # TODO: hier geeindigt: zal ik matching_teams nog aan aan land en competitie
+        #  koppelen ofzo ?? of nog sorteren op ratio?
 
     def run(self):
         self.open_sqlite_connection()
-        df_unique_team_country = self.get_unique_team_country()
-        self.check_uniqueness(df_unique_team_country)
-        self.check_fuzzy_wuzzy(df_unique_team_country)
-        print("hoi")
+        self.df_unique_team_country = self.get_unique_team_country()
+        self.check_uniqueness()
+        self.find_teams_alike()
