@@ -1,7 +1,10 @@
 from tools.controller import ProcessController
+from tools.logging import setup_logging
 
 
 def main():
+
+    setup_logging()
     controller = ProcessController()
     controller.run()
 
@@ -12,3 +15,4 @@ if __name__ == "__main__":
     do_remote_debug()
 
     main()
+    

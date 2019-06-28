@@ -1,6 +1,9 @@
+import logging
+
 import pandas as pd
-from tools.logging import log
 from tools.utils import ensure_corect_date_format
+
+log = logging.getLogger(__name__)
 
 
 class CheckResults:

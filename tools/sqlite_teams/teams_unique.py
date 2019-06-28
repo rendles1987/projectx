@@ -1,73 +1,44 @@
-from tools.csv_merger.csv_merger import SQLITE_FULL_PATH
-import numpy as np
-import os
 import logging
 import sqlite3
+
+import numpy as np
 import pandas as pd
 from fuzzywuzzy import fuzz
-from fuzzywuzzy import process
+from tools.constants import (
+    ALL_GAMENAME_ID_MAPPING,
+    COUNTRY_ID_MAPPING,
+    GAMETYPE_ID_MAPPING,
+    SQLITE_FULL_PATH,
+    TABLE_NAME_ALL_GAMES,
+    TABLE_NAME_ALL_GAMES_WITH_IDS,
+    TABLE_NAME_ALL_TEAMS,
+)
+from tools.utils import df_to_sqlite_table, sqlite_table_to_df
 
 log = logging.getLogger(__name__)
 
 
 class TeamsUnique:
     def __init__(self):
-        pass
-
-    def open_sqlite_connection(self):
-        assert os.path.isfile(SQLITE_FULL_PATH)
-        log.debug(f"connect to sqlite {SQLITE_FULL_PATH}")
-        self.connex = sqlite3.connect(SQLITE_FULL_PATH)
-
-    def close_sqlite_connection(self):
-        self.connex.close()
-
-    def get_home_away_country(self, game_type=None, international=False):
-        # This 'cur' object lets us actually send messages to our DB and receive results
-        assert game_type in ["cup", "league"]
-        if international:
-            query = """
-                    SELECT
-                        home,
-                        away,
-                        country
-                    FROM
-                        {}
-                    WHERE
-                        country == 'eur';
-                        """.format(
-                game_type
-            )
-        else:
-            query = """
-                    SELECT
-                        home,
-                        away,
-                        country
-                    FROM
-                        {}
-                    WHERE
-                        country != 'eur';
-                        """.format(
-                game_type
-            )
-        df = pd.read_sql_query(query, self.connex)
-        return df
+        self._df_unique_team_country = None
 
     def get_unique_team_country(self):
         """
         self.get_unique_teams() returns df with columns 'team' + 'country'
         :return:
         """
-        df_cup_eur = self.get_home_away_country(game_type="cup", international=True)
+        df_all_games = sqlite_table_to_df(table_name=TABLE_NAME_ALL_GAMES)
+
+        mask = (df_all_games["game_type"] == "cup") & (df_all_games["country"] == "eur")
+        df_cup_eur = df_all_games[mask]
         df_cup_eur = self.__get_unique_team_country(df_cup_eur)
 
-        df_cup_non_eur = self.get_home_away_country(
-            game_type="cup", international=False
-        )
+        mask = (df_all_games["game_type"] != "cup") & (df_all_games["country"] != "eur")
+        df_cup_non_eur = df_all_games[mask]
         df_cup_non_eur = self.__get_unique_team_country(df_cup_non_eur)
 
-        df_league = self.get_home_away_country(game_type="league", international=False)
+        mask = df_all_games["game_type"] == "league"
+        df_league = df_all_games[mask]
         df_league = self.__get_unique_team_country(df_league)
 
         # for teams in df_leauge we know from which country they are
@@ -121,9 +92,9 @@ class TeamsUnique:
 
         return df_team_country
 
-    def check_uniqueness(self):
-        len_orig = len(self.df_unique_team_country)
-        len_unique = len(self.df_unique_team_country["team"].unique())
+    def check_uniqueness(self, df_unique_team_country):
+        len_orig = len(df_unique_team_country)
+        len_unique = len(df_unique_team_country["team"].unique())
         assert len_orig == len_unique
 
     def get_processed_teams(self, teams):
@@ -164,15 +135,212 @@ class TeamsUnique:
                     matching_teams.append((team["team"], team2["team"]))
         return matching_teams
 
-    def find_teams_alike(self):
-        teams = self.df_unique_team_country["team"].to_list()
+    def find_matching_teamnames(self, df_unique_team_country):
+        teams = df_unique_team_country["team"].to_list()
         processed_teams = self.get_processed_teams(teams)
-        matching_teams = self.find_matching_teams(processed_teams)
-        # TODO: hier geeindigt: zal ik matching_teams nog aan aan land en competitie
-        #  koppelen ofzo ?? of nog sorteren op ratio?
+
+        # matching_teams = self.find_matching_teams(processed_teams)
+        matching_teams = [
+            ("ZSV", "AZSV"),
+            ("FC Lisse", "Ulisses FC"),
+            ("Lorca FC", "FC Flora"),
+            ("Parma AC", "Parma FC"),
+            ("CA Bastia", "SC Bastia"),
+            ("Feyenoord", "Feyenoord AV"),
+            ("Piense SC", "SC Praiense"),
+            ("York City", "Cork City"),
+            ("FK Astana", "FK Astana-64"),
+            ("AC Venezia", "Venezia FC"),
+            ("AC Venezia", "SSC Venezia"),
+            ("AZ Alkmaar", "AZ Alkmaar (J)"),
+            ("Burnley FC", "Barnsley FC"),
+            ("CD Ourense", "GD Sourense"),
+            ("FC Jumilla", "Jumilla CF"),
+            ("FC Messina", "ACR Messina"),
+            ("FC Treviso", "Treviso FBC"),
+            ("Granada CF", "Granada 74 CF"),
+            ("Hertha BSC", "Hertha BSC II"),
+            ("Quick Boys", "Quick Boys II"),
+            ("Venezia FC", "SSC Venezia"),
+            ("VfL Bochum", "VfL Bochum II"),
+            ("Wrexham FC", "Wrexham AFC"),
+            ("Randers FC", "Rangers FC"),
+            ("CF Palencia", "Valencia CF"),
+            ("FC St. Pauli", "FC St. Pauli II"),
+            ("GFC Ajaccio", "GFCO Ajaccio"),
+            ("Hannover 96", "Hannover 96 II"),
+            ("Lusitano GC", "Lusitano FCV"),
+            ("SC Freiburg", "SC Freiburg II"),
+            ("TeBe Berlin", "TeBe Berlin II"),
+            ("1. FC K\\xf6ln", "1. FC K\\xf6ln II"),
+            ("CD Alcal\\xe1", "RSD Alcal\\xe1"),
+            ("FC Barcelona", "FC Barcelona B"),
+            ("RKC Waalwijk", "RKC Waalwijk (J)"),
+            ("Wimbledon FC", "AFC Wimbledon"),
+            ("Hibernian FC", "Hibernians FC"),
+            ("CSV Apeldoorn", "WSV Apeldoorn"),
+            ("Calcio Chieri", "Chieti Calcio"),
+            ("De Graafschap", "De Graafschap (J)"),
+            ("FC Schalke 04", "FC Schalke 04 II"),
+            ("HVV Hollandia", "HVV Hollandia II"),
+            ("Hansa Rostock", "Hansa Rostock II"),
+            ("Hereford Town", "Hednesford Town"),
+            ("Spezia Calcio", "Pomezia Calcio"),
+            ("VfB Stuttgart", "VfB Stuttgart II"),
+            ("VfL Wolfsburg", "VfL Wolfsburg II"),
+            ("Villarreal CF", "Villarreal CF B"),
+            ("Werder Bremen", "Werder Bremen II"),
+            ("1. FSV Mainz 05", "1. FSV Mainz 05 II"),
+            ("Chesham United", "Evesham United"),
+            ("Cosenza Calcio", "Vicenza Calcio"),
+            ("Ford United FC", "AFC Telford United"),
+            ("Perugia Calcio", "AC Perugia Calcio"),
+            ("Vicenza Calcio", "Piacenza Calcio"),
+            ("HB T\\xf3rshavn", "B36 T\\xf3rshavn"),
+            ("Athletic Bilbao", "Athletic Bilbao B"),
+            ("CD San Fernando", "San Fernando CD"),
+            ("Energie Cottbus", "Energie Cottbus II"),
+            ("Jahn Regensburg", "Jahn Regensburg II"),
+            ("KR Reykjav\\xedk", "Fram Reykjav\\xedk"),
+            ("KR Reykjav\\xedk", "Fylkir Reykjav\\xedk"),
+            ("Lausanne Sports", "FC Lausanne-Sport"),
+            ("Alemannia Aachen", "Alemannia Aachen II"),
+            ("Bayer Leverkusen", "Bayer Leverkusen II"),
+            ("Bayern M\\xfcnchen", "Bayern M\\xfcnchen II"),
+            ("Manchester United", "United of Manchester"),
+            ("SD Logro\\xf1\\xe9s", "UD Logro\\xf1\\xe9s"),
+            ("Rot-Wei\\xdf Erfurt", "Rot-Wei\\xdf Erfurt II"),
+            ("Uni\\xe3o Torreense", "Uni\\xe3o Torcatense"),
+            ("1. FC Saarbr\\xfccken", "1. FC Saarbr\\xfccken II"),
+            ("Schwarz-Wei\\xdf Essen", "Schwarz-Wei\\xdf Rehden"),
+            ("CS Universitatea Craiova", "FC Universitatea Craiova"),
+        ]
+        return matching_teams
+
+    def add_id_column(self, df_unique_team_country):
+        # add an 'id' column
+        df_unique_team_country = df_unique_team_country.reset_index(drop=True)
+        df_unique_team_country["id"] = df_unique_team_country.index
+        return df_unique_team_country
+
+    def save_to_sqlite(self, df_unique_team_country):
+        # Opens file if exists, else creates file
+        log.debug(f"connect to {SQLITE_FULL_PATH}")
+        connex = sqlite3.connect(SQLITE_FULL_PATH)
+        df_unique_team_country.to_sql(
+            name=TABLE_NAME_ALL_TEAMS, con=connex, if_exists="replace", index=False
+        )
+        connex.close()
 
     def run(self):
-        self.open_sqlite_connection()
-        self.df_unique_team_country = self.get_unique_team_country()
-        self.check_uniqueness()
-        self.find_teams_alike()
+        # 1
+        df_unique_team_country = self.get_unique_team_country()
+        # 2
+        self.check_uniqueness(df_unique_team_country)
+        # 3 TODO: do something with matching_teamnames ??
+        matching_teamnames = self.find_matching_teamnames(df_unique_team_country)
+        # 4
+        df_unique_team_country = self.add_id_column(df_unique_team_country)
+        # 5
+        self.save_to_sqlite(df_unique_team_country)
+
+
+class UpdateGamesWithIds:
+    def __init__(self):
+        pass
+
+    def all_games_with_team_ids(self, df_all_games, df_all_teams):
+        # home merge team id (2 new columns are added ('team' and 'id)
+        df_home = df_all_games.merge(
+            df_all_teams[["team", "id"]], left_on="home", right_on="team"
+        )
+        df_home.drop(columns=["team"], inplace=True)
+        df_home.rename(index=str, columns={"id": "home_id"}, inplace=True)
+
+        # away merge team id (2 new columns are added ('team' and 'id)
+        df_home_away = df_home.merge(
+            df_all_teams[["team", "id"]], left_on="away", right_on="team"
+        )
+        df_home_away.drop(columns=["team"], inplace=True)
+        df_home_away.rename(index=str, columns={"id": "away_id"}, inplace=True)
+
+        # do some checks
+        orig_count_unique = df_all_teams["team"].nunique()
+        new_count_unique = pd.unique(
+            df_home_away[["home_id", "away_id"]].values.ravel("K")
+        ).size
+        assert new_count_unique == orig_count_unique
+        assert not df_home_away["home_id"].hasnans
+        assert not df_home_away["away_id"].hasnans
+
+        return df_home_away
+
+    def all_games_with_game_ids(self, df):
+        """ add columns with ints, we do not drop any columns """
+        assert "game_name" in df.columns
+        assert "game_type" in df.columns
+        assert "country" in df.columns
+        df["game_name_id"] = df["game_name"].replace(ALL_GAMENAME_ID_MAPPING)
+        df["game_type_id"] = df["game_type"].replace(GAMETYPE_ID_MAPPING)
+        df["game_country_id"] = df["country"].replace(COUNTRY_ID_MAPPING)
+        return df
+
+    def convert_dtypes_to_int(self, df):
+        """method does two things:
+        1.  Convert dyptes to int for columns we want """
+        existing_int_columns = df.select_dtypes(include=["int"]).columns
+        expected_int_columns = pd.Index(
+            [
+                "home_goals",
+                "away_goals",
+                "play_round",
+                "season",
+                "home_id",
+                "away_id",
+                "game_name_id",
+                "game_type_id",
+                "game_country_id",
+            ]
+        )
+
+        not_yet_int_col = expected_int_columns.difference(existing_int_columns)
+        if not_yet_int_col.size > 0:
+            for col in not_yet_int_col:
+                # we can only convert to int if column not hasnans (else float)
+                if not df[col].hasnans:
+                    df[col] = df[col].astype(int)
+        return df
+
+    def compress_df(self, df):
+        """Downcast integer and float dyptes to smallest (aim is to compress sqlite)
+        Downcast from int64 to uint8 (if possible) and from float64 to float32 """
+        search_types = ["integer", "float"]
+        for search_type in search_types:
+            existing_type_columns = df.select_dtypes(include=[search_type]).columns
+            for col in existing_type_columns:
+                df[col] = pd.to_numeric(df[col], downcast=search_type)
+        return df
+
+    def replace_table_all_games(self, df_games_with_team_game_id):
+        # Opens file if exists, else creates file
+        log.debug(f"connect to {SQLITE_FULL_PATH}")
+        connex = sqlite3.connect(SQLITE_FULL_PATH)
+        df_games_with_team_game_id.to_sql(
+            name=TABLE_NAME_ALL_GAMES_WITH_IDS,
+            con=connex,
+            if_exists="replace",
+            index=False,
+        )
+        connex.close()
+
+    def run(self):
+        """ we update table with home team id, away team id, """
+        df_all_games = sqlite_table_to_df(table_name=TABLE_NAME_ALL_GAMES)
+        df_all_teams = sqlite_table_to_df(table_name=TABLE_NAME_ALL_TEAMS)
+        df_games_team_id = self.all_games_with_team_ids(df_all_games, df_all_teams)
+        df_games_team_game_id = self.all_games_with_game_ids(df_games_team_id)
+        df_convert = self.convert_dtypes_to_int(df_games_team_game_id)
+        df_compress = self.compress_df(df_convert)
+        df_to_sqlite_table(
+            df_compress, table_name=TABLE_NAME_ALL_GAMES_WITH_IDS, if_exists="replace"
+        )

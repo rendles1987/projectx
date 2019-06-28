@@ -1,3 +1,4 @@
+import logging
 import os
 
 import numpy as np
@@ -5,15 +6,16 @@ import pandas as pd
 from tools.constants import (
     BASE_GAME_PROPERTIES,
     CUP_GAME_PROPERTIES,
+    DATEFORMAT_YYYYMMDD,
     GAME_SPECS,
     LEAGUE_GAME_PROPERTIES,
     PLAYER_PROPERTIES,
     SEASON_WINDOW,
-    dateformat_yyyymmdd,
 )
-from tools.logging import log
-from tools.utils import df_to_csv, is_panda_df_empty
 from tools.csv_importer.filename_checker import LeagueFilenameChecker
+from tools.utils import df_to_csv, is_panda_df_empty
+
+log = logging.getLogger(__name__)
 
 
 class BaseCsvCleaner:
@@ -127,7 +129,7 @@ class BaseCsvCleaner:
         df = pd.DataFrame({"date": [date]})
 
         try:
-            pd_date = pd.to_datetime(df["date"], format=dateformat_yyyymmdd)
+            pd_date = pd.to_datetime(df["date"], format=DATEFORMAT_YYYYMMDD)
         except:
             raise AssertionError(
                 f"{self.csv_file_name_with_extension} date format fail.. this should "
@@ -197,14 +199,13 @@ class BaseCsvCleaner:
         log.debug(f"check_date_in_range {self.csv_file_name_without_extension}")
 
         assert (
-            not self.dataframe["date"].isna().all(),
-            "I expect 'date' column does not include any np.NAN",
-        )
+            not self.dataframe["date"].isna().all()
+        ), "We expect 'date' column does not include any np.NAN"
 
         self.calc_season()
 
         try:
-            date = pd.to_datetime(self.dataframe["date"], format=dateformat_yyyymmdd)
+            date = pd.to_datetime(self.dataframe["date"], format=DATEFORMAT_YYYYMMDD)
         except:
             raise AssertionError(
                 f"{self.csv_file_name_with_extension} date format fail.. this should "
@@ -524,7 +525,7 @@ class CupCsvCleaner(BaseCsvCleaner):
         if (self.dataframe["season"].isna()).any():
 
             date_column = pd.to_datetime(
-                self.dataframe["date"], format=dateformat_yyyymmdd
+                self.dataframe["date"], format=DATEFORMAT_YYYYMMDD
             )
             calc_season_column = date_column.apply(self.get_season_from_date)
             self.dataframe["season"].fillna(calc_season_column[0], inplace=True)

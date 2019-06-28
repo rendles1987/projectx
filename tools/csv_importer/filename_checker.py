@@ -1,4 +1,7 @@
-from tools.constants import COUNTRY_CUP_NAMES, COUNTRY_LEAGUE_NAMES
+from tools.constants import (
+    CUP_COUNTRY_GAMENAMES_MAPPING,
+    LEAGUE_COUNTRY_GAMENAMES_MAPPING,
+)
 
 
 class LeagueFilenameChecker:
@@ -12,8 +15,9 @@ class LeagueFilenameChecker:
         self.csv_file_full_path = csv_file_full_path
         self._country = None
         self._game_name = None
-        self.names = COUNTRY_LEAGUE_NAMES
         self._season = None
+        self.countries = LEAGUE_COUNTRY_GAMENAMES_MAPPING.keys()
+        self.country_gamename_mapping = LEAGUE_COUNTRY_GAMENAMES_MAPPING
 
     @property
     def csv_file_name_with_extension(self):
@@ -64,19 +68,18 @@ class LeagueFilenameChecker:
 
         country = csv_file_name_without_prefix[0:3]
         # check if country in whitelist
-        assert country in self.names.keys(), (
+        assert country in self.countries, (
             self.csv_file_full_path
             + ": country "
             + country
             + " not in "
-            + str(self.names.keys())
+            + str(self.countries)
         )
         return country
 
     def _get_game_name(self):
         """ get it, but also check it """
-        country = self.country
-        expected_names = list(self.names.get(country).values())
+        expected_names = self.country_gamename_mapping.get(self.country)
         # sort list by string length (longest first)
         expected_names.sort(key=len, reverse=True)
         for gamename in expected_names:
@@ -118,7 +121,8 @@ class CupFilenameChecker(LeagueFilenameChecker):
         self.csv_file_full_path = csv_file_full_path
         self._country = None
         self._game_name = None
-        self.names = COUNTRY_CUP_NAMES
+        self.countries = CUP_COUNTRY_GAMENAMES_MAPPING.keys()
+        self.country_gamename_mapping = CUP_COUNTRY_GAMENAMES_MAPPING
 
     @property
     def season(self):

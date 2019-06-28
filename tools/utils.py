@@ -1,9 +1,11 @@
-import datetime
+import logging
 import os
+import sqlite3
 
 import pandas as pd
-from tools.constants import dateformat_yyyymmdd
-from tools.logging import log
+from tools.constants import SQLITE_FULL_PATH
+
+log = logging.getLogger(__name__)
 
 
 def is_panda_df_empty(panda_df):
@@ -46,7 +48,7 @@ def ensure_corect_date_format(df):
     to .csv dtype becomes string. lets convert these strings to same format as
     panda datetime format is '2016-01-26' (yyyy-mm-dd). """
     # first check if a 'date' column exists
-    if not "date" in df.columns:
+    if "date" not in df.columns:
         return df
     date_format_detected = detect_dateformat(df)
     date = pd.to_datetime(df["date"], format=date_format_detected, errors="ignore")
@@ -69,3 +71,49 @@ def df_to_csv(df, csv_path):
         os.remove(csv_path)
     # df.to_csv(csv_path, index=False, sep="\t", na_rep="NA")
     df.to_csv(csv_path, sep="\t", na_rep="NA", index=False)
+
+
+def sqlite_table_to_df(table_name=None):
+    assert os.path.isfile(SQLITE_FULL_PATH)
+    assert table_name
+    log.info(f"sqlite table {table_name} to panda df")
+    connex = sqlite3.connect(SQLITE_FULL_PATH)
+    query = """
+            SELECT
+                *
+            FROM
+                {};
+            """.format(
+        table_name
+    )
+    df = pd.read_sql_query(query, connex)
+    connex.close()
+    return df
+
+
+def df_to_sqlite_table(df, table_name=None, if_exists=None):
+    """
+    if_exists : {‘fail’, ‘replace’, ‘append’}, default ‘fail’
+        How to behave if the table already exists.
+            fail: Raise a ValueError.
+            replace: Drop the table before inserting new values.
+            append: Insert new values to the existing table.
+    """
+    assert os.path.isfile(SQLITE_FULL_PATH)
+    assert table_name
+    assert if_exists in ["fail", "replace", "append"]
+    log.info(f"panda df to sqlite table {table_name}")
+    connex = sqlite3.connect(SQLITE_FULL_PATH)
+    df.to_sql(name=table_name, con=connex, if_exists=if_exists, index=False)
+    connex.close()
+
+
+def drop_table_if_exists_from_sqlite(table_name=None):
+    assert os.path.isfile(SQLITE_FULL_PATH)
+    assert table_name
+    log.info(f"drop sqlite table {table_name}")
+    connex = sqlite3.connect(SQLITE_FULL_PATH)
+    cursor = connex.cursor()
+    query = """DROP TABLE IF EXISTS {};""".format(table_name)
+    cursor.execute(query)
+    connex.close()

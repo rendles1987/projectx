@@ -1,3 +1,4 @@
+import logging
 import os
 
 import pandas as pd
@@ -10,8 +11,9 @@ from tools.constants import (
     TEMP_DIR,
 )
 from tools.csv_importer.check_result import CheckResults
-from tools.logging import log
 from tools.utils import df_to_csv, ensure_corect_date_format, is_panda_df_empty
+
+log = logging.getLogger(__name__)
 
 
 def check_nan_fix_required(csv_path):
@@ -88,16 +90,15 @@ def remove_tab_strings(csv_path):
 
 def fix_nan_values(csv_path):
     """
-    # play_round    score_45    score_90    score_105   score_120   aet     pso             home_goals      away_goals      season          url         home_manager    away_manager        home_sheet      away_sheet
-    # 1	            0:0	        False	    False	    2	        0	    -2017-2018/	    http....	    Hans van Arum	Dennis Dekkers	[xx, yy]    [xx, yy]        nan                 nan             nan
-
+    # play_round    score_45    score_90    score_105   score_120   aet     pso             home_goals      away_goals      season          url         home_manager    away_manager        home_sheet      away_sheet      # noqa
+    # 1	            0:0	        False	    False	    2	        0	    -2017-2018/	    http....	    Hans van Arum	Dennis Dekkers	[xx, yy]    [xx, yy]        nan                 nan             nan             # noqa
 
 
     # 1. copy eerst naar df_copy
     # 2. loop door df
-    # 3. - als score_90 is False/True dan moet alles in (alle col vanaf score_90) 3 naar rechts
-    #    - als score_105 is False/True dan moet alles (alle col vanaf score_105) 2 naar rechts
-    #    - als score_105 is False/True dan moet alles (alle col vanaf score_120) 1 naar rechts
+    # 3. - als score_90 is False/True dan moet alles in (alle col vanaf score_90) 3 naar rechts  # noqa
+    #    - als score_105 is False/True dan moet alles (alle col vanaf score_105) 2 naar rechts   # noqa
+    #    - als score_105 is False/True dan moet alles (alle col vanaf score_120) 1 naar rechts   # noqa
 
     """
 
@@ -139,9 +140,11 @@ def fix_nan_values(csv_path):
 
         if shift_right == 3:
             update_these_columns_first = list(sequence_columns)[3:]
-            # ['aet', 'pso', 'home_goals', 'away_goals', 'season', 'url', 'home_manager', 'away_manager', 'home_sheet', 'away_sheet']
+            # ['aet', 'pso', 'home_goals', 'away_goals', 'season', 'url',
+            # 'home_manager', 'away_manager', 'home_sheet', 'away_sheet']
             update_to_these_columns = list(sequence_columns)[:-3]
-            # ['score_90', 'score_105', 'score_120', 'aet', 'pso', 'home_goals', 'away_goals', 'season', 'url', 'home_manager']
+            # ['score_90', 'score_105', 'score_120', 'aet', 'pso', 'home_goals',
+            # 'away_goals', 'season', 'url', 'home_manager']
             assert len(update_these_columns_first) == len(update_to_these_columns)
             row_copy[update_these_columns_first] = row[update_to_these_columns]
             row_copy["score_90"] = np.NaN
@@ -149,18 +152,22 @@ def fix_nan_values(csv_path):
             row_copy["score_120"] = np.NaN
         elif shift_right == 2:
             update_these_columns_first = list(sequence_columns)[3:]
-            # ['aet', 'pso', 'home_goals', 'away_goals', 'season', 'url', 'home_manager', 'away_manager', 'home_sheet', 'away_sheet']
+            # ['aet', 'pso', 'home_goals', 'away_goals', 'season', 'url',
+            # 'home_manager', 'away_manager', 'home_sheet', 'away_sheet']
             update_to_these_columns = list(sequence_columns)[1:-2]
-            # ['score_105', 'score_120', 'aet', 'pso', 'home_goals', 'away_goals', 'season', 'url', 'home_manager', 'away_manager']
+            # ['score_105', 'score_120', 'aet', 'pso', 'home_goals', 'away_goals',
+            # 'season', 'url', 'home_manager', 'away_manager']
             assert len(update_these_columns_first) == len(update_to_these_columns)
             row_copy[update_these_columns_first] = row[update_to_these_columns]
             row_copy["score_105"] = np.NaN
             row_copy["score_120"] = np.NaN
         elif shift_right == 1:
             update_these_columns_first = list(sequence_columns)[3:]
-            # ['aet', 'pso', 'home_goals', 'away_goals', 'season', 'url', 'home_manager', 'away_manager', 'home_sheet', 'away_sheet']
+            # ['aet', 'pso', 'home_goals', 'away_goals', 'season', 'url',
+            # 'home_manager', 'away_manager', 'home_sheet', 'away_sheet']
             update_to_these_columns = list(sequence_columns)[2:-1]
-            # ['score_120', 'aet', 'pso', 'home_goals', 'away_goals', 'season', 'url', 'home_manager', 'away_manager', 'home_sheet']
+            # ['score_120', 'aet', 'pso', 'home_goals', 'away_goals', 'season', 'url',
+            # 'home_manager', 'away_manager', 'home_sheet']
             assert len(update_these_columns_first) == len(update_to_these_columns)
             row_copy[update_these_columns_first] = row[update_to_these_columns]
             row_copy["score_120"] = np.NaN
@@ -253,7 +260,8 @@ def fix_players_sheets(new_df, csv_path, index_wrong):
 
 
 def fix_needed_players_sheets_in_one_column(new_df):
-    # before we trough away the old csv, first check if column home_sheet and away_sheet are filled proper
+    # before we trough away the old csv, first check if column home_sheet and away_
+    # sheet are filled proper:
     # - we assume minimal length of 100 chars
     # - only check if url startswith 'hhtp'
     min_len_sheet_string = 100

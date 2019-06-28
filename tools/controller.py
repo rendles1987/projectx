@@ -1,12 +1,9 @@
+import logging
 import os
 import shutil
 
 from tools.constants import CLEAN_CSV_DIRS, IMPORT_CSV_DIRS, RAW_CSV_DIRS
-from tools.csv_cleaner.csv_cleaner import (
-    CupCsvCleaner,
-    LeagueCsvCleaner,
-    PlayerCsvCleaner,
-)
+from tools.csv_cleaner.csv_cleaner import CupCsvCleaner, LeagueCsvCleaner
 from tools.csv_dir_info import CleanCsvInfo, ImportCsvInfo, RawCsvInfo
 from tools.csv_importer.filename_checker import (
     CupFilenameChecker,
@@ -21,9 +18,10 @@ from tools.csv_importer.raw_csv_importer import (
 )
 from tools.csv_merger.csv_enricher import CupCsvEnricher, LeagueCsvEnricher
 from tools.csv_merger.csv_merger import MergeCsvToSqlite
-from tools.logging import log
+from tools.sqlite_teams.club_stats import ManageTeamStats
+from tools.sqlite_teams.teams_unique import TeamsUnique, UpdateGamesWithIds
 
-from tools.sqlite_teams.teams_unique import TeamsUnique
+log = logging.getLogger(__name__)
 
 
 class ProcessController:
@@ -236,8 +234,16 @@ class ProcessController:
         merger.run()
 
     def create_unique_teams(self):
-        unique_teams = TeamsUnique()
-        unique_teams.run()
+        teams_unique = TeamsUnique()
+        teams_unique.run()
+
+    def update_games_with_ids(self):
+        update = UpdateGamesWithIds()
+        update.run()
+
+    def calculate_club_stats(sefl):
+        manage_club_stats = ManageTeamStats()
+        manage_club_stats.run()
 
     def link_players(self):
         pass
@@ -284,6 +290,8 @@ class ProcessController:
     def determine_teams(self):
         """ from here all happens in sqlite"""
         self.create_unique_teams()
+        self.update_games_with_ids()
+        self.calculate_club_stats()
 
     def do_ml(self):
         self.run_ml()
