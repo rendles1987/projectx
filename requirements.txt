@@ -5,3 +5,6 @@ pandas
 lxml
 fuzzywuzzy
 dataclasses
+isort
+flake8
+black

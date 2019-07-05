@@ -1,7 +1,5 @@
-from tools.constants import (
-    CUP_COUNTRY_GAMENAMES_MAPPING,
-    LEAGUE_COUNTRY_GAMENAMES_MAPPING,
-)
+from tools.constants import CUP_COUNTRY_GAMENAMES_MAPPING
+from tools.constants import LEAGUE_COUNTRY_GAMENAMES_MAPPING
 
 
 class LeagueFilenameChecker:

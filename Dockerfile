@@ -2,6 +2,9 @@ FROM ubuntu:18.04
 
 RUN apt-get -y update \
     && apt-get -y install --no-install-recommends \
+        # build-essential enables Makefile etc
+        build-essential \
+        python3-dev \
         python3-dev \
         python3-pip \
         git \

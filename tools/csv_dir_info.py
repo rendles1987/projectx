@@ -1,6 +1,8 @@
-import os
+from tools.constants import CLEAN_CSV_DIRS
+from tools.constants import IMPORT_CSV_DIRS
+from tools.constants import RAW_CSV_DIRS
 
-from tools.constants import CLEAN_CSV_DIRS, IMPORT_CSV_DIRS, RAW_CSV_DIRS
+import os
 
 
 class RawCsvInfo:

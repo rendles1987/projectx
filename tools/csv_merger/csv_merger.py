@@ -1,14 +1,14 @@
+from tools.constants import SQLITE_FULL_PATH
+from tools.constants import TABLE_NAME_ALL_GAMES
+from tools.utils import df_to_sqlite_table
+from tools.utils import drop_table_if_exists_from_sqlite
+from tools.utils import sqlite_table_to_df
+
 import logging
 import os
+import pandas as pd
 import sqlite3
 
-import pandas as pd
-from tools.constants import SQLITE_FULL_PATH, TABLE_NAME_ALL_GAMES
-from tools.utils import (
-    df_to_sqlite_table,
-    drop_table_if_exists_from_sqlite,
-    sqlite_table_to_df,
-)
 
 log = logging.getLogger(__name__)
 

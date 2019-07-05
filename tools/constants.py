@@ -1,4 +1,6 @@
-from collections import defaultdict, namedtuple
+from collections import defaultdict
+from collections import namedtuple
+
 
 DATEFORMAT_YYYYMMDD = "%Y-%m-%d"
 

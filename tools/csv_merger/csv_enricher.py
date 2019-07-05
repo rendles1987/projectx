@@ -1,11 +1,10 @@
-import os
+from tools.csv_importer.filename_checker import CupFilenameChecker
+from tools.csv_importer.filename_checker import LeagueFilenameChecker
+from tools.utils import df_to_csv
+from tools.utils import is_panda_df_empty
 
+import os
 import pandas as pd
-from tools.csv_importer.filename_checker import (
-    CupFilenameChecker,
-    LeagueFilenameChecker,
-)
-from tools.utils import df_to_csv, is_panda_df_empty
 
 
 class BaseCsvEnricher:

@@ -1,9 +1,10 @@
+from tools.constants import SQLITE_FULL_PATH
+
 import logging
 import os
+import pandas as pd
 import sqlite3
 
-import pandas as pd
-from tools.constants import SQLITE_FULL_PATH
 
 log = logging.getLogger(__name__)
 

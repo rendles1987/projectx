@@ -1,19 +1,19 @@
-import logging
-import sqlite3
+from fuzzywuzzy import fuzz
+from tools.constants import ALL_GAMENAME_ID_MAPPING
+from tools.constants import COUNTRY_ID_MAPPING
+from tools.constants import GAMETYPE_ID_MAPPING
+from tools.constants import SQLITE_FULL_PATH
+from tools.constants import TABLE_NAME_ALL_GAMES
+from tools.constants import TABLE_NAME_ALL_GAMES_WITH_IDS
+from tools.constants import TABLE_NAME_ALL_TEAMS
+from tools.utils import df_to_sqlite_table
+from tools.utils import sqlite_table_to_df
 
+import logging
 import numpy as np
 import pandas as pd
-from fuzzywuzzy import fuzz
-from tools.constants import (
-    ALL_GAMENAME_ID_MAPPING,
-    COUNTRY_ID_MAPPING,
-    GAMETYPE_ID_MAPPING,
-    SQLITE_FULL_PATH,
-    TABLE_NAME_ALL_GAMES,
-    TABLE_NAME_ALL_GAMES_WITH_IDS,
-    TABLE_NAME_ALL_TEAMS,
-)
-from tools.utils import df_to_sqlite_table, sqlite_table_to_df
+import sqlite3
+
 
 log = logging.getLogger(__name__)
 
