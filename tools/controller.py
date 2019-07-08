@@ -13,12 +13,14 @@ from tools.csv_importer.raw_csv_importer import CupCsvImporter
 from tools.csv_importer.raw_csv_importer import fix_nan_values
 from tools.csv_importer.raw_csv_importer import LeagueCsvImporter
 from tools.csv_importer.raw_csv_importer import remove_tab_strings
+from tools.csv_importer.raw_csv_importer import possible_fix_delimeter_type
 from tools.csv_merger.csv_enricher import CupCsvEnricher
 from tools.csv_merger.csv_enricher import LeagueCsvEnricher
 from tools.csv_merger.csv_merger import MergeCsvToSqlite
 from tools.sqlite_teams.club_stats import ManageTeamStats
 from tools.sqlite_teams.teams_unique import TeamsUnique
 from tools.sqlite_teams.teams_unique import UpdateGamesWithIds
+from tools.csv_importer.raw_csv_importer import df_fix_players, df_to_csv
 
 import logging
 import os
@@ -172,6 +174,12 @@ class ProcessController:
                 league_filename_checker = LeagueFilenameChecker(csv_file_path)
                 league_filename_checker.check_all()
 
+    def correct_delimeter_type(self):
+        """Correct .csv delimeter type eventual from comma to tab"""
+        import_csvs = ImportCsvInfo()
+        for csv_type, csv_file_path in import_csvs.csv_info:
+            possible_fix_delimeter_type(csv_type, csv_file_path)
+
     def correct_nan_in_csv(self):
         """ only for cup csv: shifts empty cells in cup csv to right and adds
         'NA' to empty cell """
@@ -189,6 +197,14 @@ class ProcessController:
             #     nan_fix_required = check_nan_fix_required(csv_file_path)
             #     if nan_fix_required:
             #         raise AssertionError("I only expected nan error in cup csvs..")
+
+    def fix_player_sheets(self):
+        log.info("correct_nan_in_csv")
+        import_csv_info = ImportCsvInfo()
+        for csv_type, csv_file_path in import_csv_info.csv_info:
+            if csv_type in ["cup", "league"]:
+                df = df_fix_players(csv_file_path)
+                df_to_csv(df, csv_file_path)  # replace if exists
 
     def remove_tab_strings_from_df(self):
         log.info("remove tab strings from pd df")
@@ -274,7 +290,9 @@ class ProcessController:
         self.copy_raw_to_import()  # replace '-' with '_'
         self.improve_imported_filename()  # replace '-' with '_'
         self.check_imported_filename()  # raises when filename incorrect
+        self.correct_delimeter_type()
         self.correct_nan_in_csv()  # noqa only for cup csv: shifts empty cells in cup csv to right and adds 'NA' to empty cell
+        self.fix_player_sheets()
         self.remove_tab_strings_from_df()  # noqa replace strings like '\t' with '', overwrites existing raw_csv
         self.convert_csv_data()
 
@@ -302,9 +320,9 @@ class ProcessController:
 
     def run(self):
         # self.do_scrape()  # scrap data (webpage --> raw)
-        # self.do_import()  # import raw data (raw --> import)
-        # self.do_clean()  # clean data (import --> clean)
-        # self.do_merge()  # add 2 or 3 columns to clean and then merge to sqlite
+        self.do_import()  # import raw data (raw --> import)
+        self.do_clean()  # clean data (import --> clean)
+        self.do_merge()  # add 2 or 3 columns to clean and then merge to sqlite
         self.determine_teams()
         # self.do_ml()
         log.info("shutting down")

@@ -10,54 +10,60 @@ TABLE_NAME_ALL_GAMES = "all_games"
 TABLE_NAME_ALL_GAMES_WITH_IDS = "all_games_ids"
 
 
-#
-# RAW_CSV_DIRS = {
-#     "cup": "/work/data/temp_stuff/_01_raw/cup",
-#     "league": "/work/data/temp_stuff/_01_raw/league",
-#     "player": "/work/data/temp_stuff/_01_raw/player",
-# }
-#
-# IMPORT_CSV_DIRS = {
-#     "cup": "/work/data/temp_stuff/_02_import/cup",
-#     "league": "/work/data/temp_stuff/_02_import/league",
-#     "player": "/work/data/temp_stuff/_02_import/player",
-# }
-#
-#
-# CLEAN_CSV_DIRS = {
-#     "cup": "/work/data/temp_stuff/_03_clean/cup",
-#     "league": "/work/data/temp_stuff/_03_clean/league",
-#     "player": "/work/data/temp_stuff/_03_clean/player",
-# }
-#
-# MERGE_CSV_DIR = "/work/data/temp_stuff/_04_merge/"
+use_temp = True
+if use_temp:
+    RAW_CSV_DIRS = {
+        "cup": "/work/data/temp_stuff/_01_raw/cup",
+        "league": "/work/data/temp_stuff/_01_raw/league",
+        "player": "/work/data/temp_stuff/_01_raw/player",
+    }
+
+    IMPORT_CSV_DIRS = {
+        "cup": "/work/data/temp_stuff/_02_import/cup",
+        "league": "/work/data/temp_stuff/_02_import/league",
+        "player": "/work/data/temp_stuff/_02_import/player",
+    }
+
+    CLEAN_CSV_DIRS = {
+        "cup": "/work/data/temp_stuff/_03_clean/cup",
+        "league": "/work/data/temp_stuff/_03_clean/league",
+        "player": "/work/data/temp_stuff/_03_clean/player",
+    }
+
+    MERGE_CSV_DIR = "/work/data/temp_stuff/_04_merge/"
+
+    SQLITE_NAME = "my_sqlite_temp_stuff.db"
+    SQLITE_FULL_PATH = MERGE_CSV_DIR + SQLITE_NAME
+else:
+    RAW_CSV_DIRS = {
+        "cup": "/work/data/_01_raw/cup",
+        "league": "/work/data/_01_raw/league",
+        "player": "/work/data/_01_raw/player",
+    }
+
+    IMPORT_CSV_DIRS = {
+        "cup": "/work/data/_02_import/cup",
+        "league": "/work/data/_02_import/league",
+        "player": "/work/data/_02_import/player",
+    }
+
+    CLEAN_CSV_DIRS = {
+        "cup": "/work/data/_03_clean/cup",
+        "league": "/work/data/_03_clean/league",
+        "player": "/work/data/_03_clean/player",
+    }
+
+    MERGE_CSV_DIR = "/work/data/_04_merge/"
+
+    SQLITE_NAME = "my_sqlite.db"
+    SQLITE_FULL_PATH = MERGE_CSV_DIR + SQLITE_NAME
 
 
-RAW_CSV_DIRS = {
-    "cup": "/work/data/_01_raw/cup",
-    "league": "/work/data/_01_raw/league",
-    "player": "/work/data/_01_raw/player",
-}
+TAB_DELIMETER = "\t"
+COMMA_DELIMETER = ","
 
-IMPORT_CSV_DIRS = {
-    "cup": "/work/data/_02_import/cup",
-    "league": "/work/data/_02_import/league",
-    "player": "/work/data/_02_import/player",
-}
-
-
-CLEAN_CSV_DIRS = {
-    "cup": "/work/data/_03_clean/cup",
-    "league": "/work/data/_03_clean/league",
-    "player": "/work/data/_03_clean/player",
-}
-
-MERGE_CSV_DIR = "/work/data/_04_merge/"
 
 TEMP_DIR = "/work/data/tmp"
-
-SQLITE_NAME = "my_sqlite.db"
-SQLITE_FULL_PATH = MERGE_CSV_DIR + SQLITE_NAME
 
 fields = ["id", "name", "type", "country", "level"]
 game_info = namedtuple("game_named_tup", fields)

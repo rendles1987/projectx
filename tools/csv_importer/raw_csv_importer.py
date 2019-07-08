@@ -3,7 +3,7 @@ from tools.constants import CUP_GAME_PROPERTIES
 from tools.constants import DTYPES
 from tools.constants import LEAGUE_GAME_PROPERTIES
 from tools.constants import PLAYER_PROPERTIES
-from tools.constants import TEMP_DIR
+from tools.constants import TEMP_DIR, TAB_DELIMETER, COMMA_DELIMETER
 from tools.csv_importer.check_result import CheckResults
 from tools.utils import df_to_csv
 from tools.utils import ensure_corect_date_format
@@ -12,18 +12,64 @@ from tools.utils import is_panda_df_empty
 import logging
 import os
 import pandas as pd
-
+import numpy as np
 
 log = logging.getLogger(__name__)
 
 
-def check_nan_fix_required(csv_path):
-    delimiter_type = detect_delimeter_type(csv_path)  # '\t' or ','
-    temp_df = pd.read_csv(csv_path, sep=delimiter_type)
-
-    """ checks if all columns
-    - if column contains False/True and other strings --> then nan_fix_required
+def detect_delimeter_type(csv_type, csv_file_full_path):
+    """Detects whether it is a .csv or .tsv
+    csv_type = 'cup' --> column 'date' should exist
+    csv_type = 'league' --> column 'date' should exist
+    csv_type = 'player' --> column 'xxx' should exist
     """
+    expected_column = None
+    if csv_type in ["cup", "league"]:
+        expected_column = "date"
+    elif csv_type == "player":
+        # TODO: implement this for players csv as well
+        pass
+    else:
+        raise AssertionError("unexpected csv_type")
+    try:
+        # is it a .tsv ?
+        pd_text_file_reader = pd.read_csv(
+            csv_file_full_path, sep=TAB_DELIMETER, skiprows=0, chunksize=1
+        )
+        row = pd_text_file_reader.get_chunk()
+        test = row[expected_column]
+        return "\t"
+    except Exception:
+        try:
+            # then it should be a .tsv ?
+            pd_text_file_reader = pd.read_csv(
+                csv_file_full_path, sep=COMMA_DELIMETER, skiprows=0, chunksize=1
+            )
+            row = pd_text_file_reader.get_chunk()
+            test = row[expected_column]
+            return ","
+        except Exception:
+            raise AssertionError(csv_file_full_path + "not a .tsv/.csv ??")
+
+
+def possible_fix_delimeter_type(csv_type, csv_path):
+    delimiter_type = detect_delimeter_type(csv_type, csv_path)
+    if delimiter_type not in [TAB_DELIMETER, COMMA_DELIMETER]:
+        log.critical(f"unsupported delimeter type {delimiter_type} {csv_path}")
+    if delimiter_type != TAB_DELIMETER:
+        # we need to fix delimeter type
+        log.info(f"incorrect delimeter type {delimiter_type} found for csv {csv_path}")
+        temp_df = pd.read_csv(csv_path, sep=delimiter_type)
+        os.remove(csv_path)
+        df_to_csv(temp_df, csv_path)
+
+
+def check_nan_fix_required(csv_path):
+    """Only for csv_type 'cup'
+    Check all 'blablabla_score' columns (one by one) if column contains a
+    True/False AND a string. If so, then then nan_fix_required
+    """
+    temp_df = pd.read_csv(csv_path, sep=TAB_DELIMETER)
 
     # this only works for 'cup' csvs
     score_columns = [clm for clm in temp_df.columns if str(clm).startswith("score_")]
@@ -57,32 +103,9 @@ def check_nan_fix_required(csv_path):
     return False
 
 
-def detect_delimeter_type(csv_file_full_path):
-    """" detects whether it is a .csv or .tsv """
-    # is it a .tsv ?
-    try:
-        pd_text_file_reader = pd.read_csv(
-            csv_file_full_path, sep="\t", skiprows=0, chunksize=1
-        )
-        row = pd_text_file_reader.get_chunk()
-        row["date"]
-        return "\t"
-    except Exception:
-        try:
-            # then it should be a .tsv ?
-            pd_text_file_reader = pd.read_csv(
-                csv_file_full_path, sep=",", skiprows=0, chunksize=1
-            )
-            row = pd_text_file_reader.get_chunk()
-            row["date"]
-            return ","
-        except Exception:
-            raise AssertionError(csv_file_full_path + "not a .tsv/.csv ??")
-
-
 def remove_tab_strings(csv_path):
     unwanted_strings = [r"\t", r"\r", r"\n", r"\\t", r"\\r", r"\\n"]
-    new_df = pd.read_csv(csv_path, sep="\t")
+    new_df = pd.read_csv(csv_path, sep=TAB_DELIMETER)
     for unwanted in unwanted_strings:
         new_df.replace(unwanted, "", regex=True, inplace=True)
     os.remove(csv_path)
@@ -119,12 +142,8 @@ def fix_nan_values(csv_path):
         "away_sheet",
     )
 
-    import numpy as np
-
-    delimiter_type = detect_delimeter_type(csv_path)  # '\t' or ','
-
     for row_idx, row in enumerate(
-        pd.read_csv(csv_path, sep=delimiter_type, skiprows=0, chunksize=1)
+        pd.read_csv(csv_path, sep=TAB_DELIMETER, skiprows=0, chunksize=1)
     ):
         log.info("fix_nan_values row_index: " + str(row_idx))
 
@@ -173,29 +192,33 @@ def fix_nan_values(csv_path):
             row_copy[update_these_columns_first] = row[update_to_these_columns]
             row_copy["score_120"] = np.NaN
 
+        # cummulate the rows to 1 df
         if row_idx == 0:
             new_df = row_copy
         else:
             new_df = pd.concat([new_df, row_copy], ignore_index=True)
 
-    fix_needed, index_wrong = fix_needed_players_sheets_in_one_column(new_df)
-    if fix_needed:
-        new_df = fix_players_sheets(new_df, csv_path, index_wrong)
+    df = df_fix_players(csv_path, df=new_df)
+    df_to_csv(df, csv_path)  # replace if exists
 
-    # remove columns with "unnamed" in header
-    unnamed_columns = [clm for clm in new_df.columns if "unnamed" in clm.lower()]
-    new_df.drop(unnamed_columns, axis=1, inplace=True)
-    os.remove(csv_path)
-    df_to_csv(new_df, csv_path)
+
+def df_fix_players(csv_path, df=None):
+    if is_panda_df_empty(df):
+        df = pd.read_csv(csv_path, sep=TAB_DELIMETER)
+    fix_needed, index_wrong = fix_needed_players_sheets_in_one_column(df)
+    if fix_needed:
+        df = fix_players_sheets(df, csv_path, index_wrong)
+    unnamed_columns = [clm for clm in df.columns if "unnamed" in clm.lower()]
+    if len(unnamed_columns) > 0:
+        df.drop(unnamed_columns, axis=1, inplace=True)
+    return df
 
 
 def fix_players_sheets(new_df, csv_path, index_wrong):
-    delimiter_type = detect_delimeter_type(csv_path)
-
     index_wrong_list = index_wrong.to_list()
 
     for row_idx, row in enumerate(
-        pd.read_csv(csv_path, sep=delimiter_type, skiprows=0, chunksize=1)
+        pd.read_csv(csv_path, sep=TAB_DELIMETER, skiprows=0, chunksize=1)
     ):
         if row_idx not in index_wrong_list:
             continue
@@ -260,28 +283,34 @@ def fix_players_sheets(new_df, csv_path, index_wrong):
     return new_df
 
 
-def fix_needed_players_sheets_in_one_column(new_df):
-    # before we trough away the old csv, first check if column home_sheet and away_
-    # sheet are filled proper:
-    # - we assume minimal length of 100 chars
-    # - only check if url startswith 'hhtp'
+def fix_needed_players_sheets_in_one_column(df):
+    """Check if players (away_sheet and home_sheet) are in one column and not
+    spread out over multiple columns. Check per row:
+    - column ((away_sheet and home_sheet) must have minimal length of 100 chars
+    - only check if column 'url' startswith 'hhtp'
+    :param df:
+    :return:    fix_is_needed --> boolean
+                index_true --> pd.Index() (indices of df rows which must be fixed)
+    """
+
     min_len_sheet_string = 100
     mask_homesheet_too_short = (
-        (new_df["home_sheet"].str.len() < min_len_sheet_string)
-        & (new_df["home_sheet"] != "[]")
-        & (new_df["url"].str.startswith("http"))
+        (df["home_sheet"].str.len() < min_len_sheet_string)
+        & (df["home_sheet"] != "[]")
+        & (df["url"].str.startswith("http"))
     )
     mask_awaysheet_too_short = (
-        (new_df["away_sheet"].str.len() < min_len_sheet_string)
-        & (new_df["away_sheet"] != "[]")
-        & (new_df["url"].str.startswith("http"))
+        (df["away_sheet"].str.len() < min_len_sheet_string)
+        & (df["away_sheet"] != "[]")
+        & (df["url"].str.startswith("http"))
     )
-
+    fix_is_needed = False
+    index_true = None
     both_mask = mask_homesheet_too_short + mask_awaysheet_too_short
-    if both_mask.any():  # if any true, then fix is needed
+    if both_mask.any():
+        fix_is_needed = True
         index_true = both_mask[both_mask == True].index
-        return True, index_true
-    return False, None
+    return fix_is_needed, index_true
 
 
 def check_properties(props, orig_df_columns, csv_full_path):
@@ -353,8 +382,7 @@ class BaseCsvImporter:
     def dataframe(self):
         if not is_panda_df_empty(self._dataframe):
             return self._dataframe
-        delimiter_type = detect_delimeter_type(self.csv_file_full_path)  # '\t' or ','
-        self._dataframe = pd.read_csv(self.csv_file_full_path, sep=delimiter_type)
+        self._dataframe = pd.read_csv(self.csv_file_full_path, sep=TAB_DELIMETER)
         return self._dataframe
 
     @property
@@ -474,7 +502,7 @@ class BaseCsvImporter:
         check_results = CheckResults()
         df_nr_rows = df_selection.shape[0]
         for row_idx, df_row in enumerate(
-            pd.read_csv(tmp_csv_path, sep="\t", skiprows=0, chunksize=1)
+            pd.read_csv(tmp_csv_path, sep=TAB_DELIMETER, skiprows=0, chunksize=1)
         ):
             log.info(f"check row {row_idx}/{df_nr_rows}")
             okay, msg = self.can_convert_dtypes_one_row(
