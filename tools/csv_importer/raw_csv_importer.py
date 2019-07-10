@@ -96,7 +96,7 @@ def check_nan_fix_required(csv_path):
             nr_nan = nr_rows - temp_df[column].count()
         nr_bool = nr_false + nr_true
 
-        if nr_rows - (nr_bool + nr_nan) > 0:
+        if nr_rows > (nr_bool + nr_nan):
             # column includes a leftover: no boolean, no nan, but another string?
             # we need to fix this, so nan_fix_required = True
             return True
@@ -205,7 +205,7 @@ def fix_nan_values(csv_path):
 def df_fix_players(csv_path, df=None):
     if is_panda_df_empty(df):
         df = pd.read_csv(csv_path, sep=TAB_DELIMETER)
-    fix_needed, index_wrong = fix_needed_players_sheets_in_one_column(df)
+    fix_needed, index_wrong = fix_needed_players_sheets_in_one_column(csv_path, df)
     if fix_needed:
         df = fix_players_sheets(df, csv_path, index_wrong)
     unnamed_columns = [clm for clm in df.columns if "unnamed" in clm.lower()]
@@ -243,19 +243,21 @@ def fix_players_sheets(new_df, csv_path, index_wrong):
                 if not bracket_open_first:
                     bracket_open_first = clm_idx
                 else:
-                    if bracket_open_second:
-                        raise AssertionError("found too many [")
-                    bracket_open_second = clm_idx
+                    if not bracket_open_second:
+                        # we already count brackets in check_count_brackets(),
+                        # so no need to raise here
+                        bracket_open_second = clm_idx
             if str(row[clm].values).count("]") == 2:
                 if not bracket_close_first:
                     bracket_close_first = clm_idx
                 else:
-                    if bracket_close_second:
-                        raise AssertionError("found too many ]")
-                    bracket_close_second = clm_idx
+                    if not bracket_close_second:
+                        bracket_close_second = clm_idx
 
         if not bracket_open_second or not bracket_close_second:
-            raise AssertionError(f"{csv_path} could not find last column with bracket")
+            raise AssertionError(
+                f"{csv_path} row_idx {row_idx} could not find last column with bracket"
+            )
 
         # dataFrame.loc[<ROWS RANGE> , <COLUMNS RANGE>]
         home_df = row.iloc[:, bracket_open_first : bracket_close_first + 1]
@@ -283,34 +285,80 @@ def fix_players_sheets(new_df, csv_path, index_wrong):
     return new_df
 
 
-def fix_needed_players_sheets_in_one_column(df):
+def fix_needed_players_sheets_in_one_column(csv_path, df):
     """Check if players (away_sheet and home_sheet) are in one column and not
     spread out over multiple columns. Check per row:
-    - column ((away_sheet and home_sheet) must have minimal length of 100 chars
+    - column ((away_sheet and home_sheet) must have minimal length of 90 chars
     - only check if column 'url' startswith 'hhtp'
     :param df:
     :return:    fix_is_needed --> boolean
                 index_true --> pd.Index() (indices of df rows which must be fixed)
     """
 
-    min_len_sheet_string = 100
-    mask_homesheet_too_short = (
-        (df["home_sheet"].str.len() < min_len_sheet_string)
-        & (df["home_sheet"] != "[]")
-        & (df["url"].str.startswith("http"))
+    for bracket_type in ["opening", "closing"]:
+        # check_count_brackets raise AssertionError if nr bracket is wrong
+        check_count_brackets(df, csv_path, bracket_type=bracket_type)
+
+    df_obj = df.select_dtypes(["object"])
+
+    # create same size panda df filled with False
+    df_obj_closed_by_bracket = pd.DataFrame(
+        False, index=np.arange(len(df_obj)), columns=df_obj.columns
     )
-    mask_awaysheet_too_short = (
-        (df["away_sheet"].str.len() < min_len_sheet_string)
-        & (df["away_sheet"] != "[]")
-        & (df["url"].str.startswith("http"))
+    # update False to True if cell startwith '[' and endswith ']'
+    for col in df_obj.columns:
+        mask_col_closed_by_brackets = (df_obj[col].str.startswith("[")) & (
+            df_obj[col].str.endswith("]")
+        )
+        if mask_col_closed_by_brackets.any():
+            df_obj_closed_by_bracket[col] = mask_col_closed_by_brackets
+    # check if columns home_sheet and away_sheet DO contain '[' and ']'
+    mask_sheets_okay = (
+        df_obj_closed_by_bracket["home_sheet"] & df_obj_closed_by_bracket["away_sheet"]
     )
-    fix_is_needed = False
-    index_true = None
-    both_mask = mask_homesheet_too_short + mask_awaysheet_too_short
-    if both_mask.any():
-        fix_is_needed = True
-        index_true = both_mask[both_mask == True].index
-    return fix_is_needed, index_true
+
+    mask_url_startswith_http = df["url"].str.startswith("http")
+
+    # we can only expect sheets with brackets is url starts with http
+    mask_wrong = mask_url_startswith_http & ~mask_sheets_okay
+    idx_wrong = mask_wrong[mask_wrong].index
+    if len(idx_wrong) > 0:
+        # one/both sheet column(s) do/does not startwith '[' and end with ']'
+        return True, idx_wrong
+    return False, None
+
+
+def check_count_brackets(df, csv_path, bracket_type=None):
+    assert bracket_type in ["opening", "closing"]
+    if bracket_type == "opening":
+        bracket_sign = "\["
+    else:
+        bracket_sign = "\]"
+
+    df_obj = df.select_dtypes(["object"])
+    df_obj_count_bracket = pd.DataFrame(
+        0, index=np.arange(len(df_obj)), columns=df_obj.columns
+    )
+    for col in df_obj.columns:
+        mask_count_brackets = df_obj[col].str.count(bracket_sign)
+        if mask_count_brackets.sum() > 0:
+            df_obj_count_bracket[col] = mask_count_brackets
+
+    if max(df_obj_count_bracket.max()) != 1:
+        # We expect no more than 1 opening bracket and 1 closing bracket type per cell
+        mask_multiple_bracket_per_cell = (df_obj_count_bracket > 1).sum(axis=1) > 0
+        if mask_multiple_bracket_per_cell.any():
+            idx = mask_multiple_bracket_per_cell[mask_multiple_bracket_per_cell].index
+            raise AssertionError(
+                f"more than 1 {bracket_type} bracket found in 1 cell in row(s) {str(idx)} in {csv_path}"
+            )
+        # We expect no more than 2 opening and 2 closing brackets row
+        mask_too_many_brackets_per_row = (df_obj_count_bracket).sum(axis=1) > 2
+        if mask_too_many_brackets_per_row.any():
+            idx = mask_too_many_brackets_per_row[mask_too_many_brackets_per_row].index
+            raise AssertionError(
+                f"more than 2 {bracket_type} brackets found in row(s) {str(idx)} in {csv_path}"
+            )
 
 
 def check_properties(props, orig_df_columns, csv_full_path):

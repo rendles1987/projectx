@@ -512,7 +512,7 @@ class BaseCsvCleaner:
 class CupCsvCleaner(BaseCsvCleaner):
     def __init__(self, csvfilepath):
         BaseCsvCleaner.__init__(self, csvfilepath)
-        self.csv_type = "league"
+        self.csv_type = "cup"
         self.properties = CUP_GAME_PROPERTIES
         self.max_goals = GAME_SPECS.cup_max_goals
 
@@ -698,7 +698,7 @@ class CupCsvCleaner(BaseCsvCleaner):
 class LeagueCsvCleaner(BaseCsvCleaner):
     def __init__(self, csvfilepath):
         BaseCsvCleaner.__init__(self, csvfilepath)
-        self.csv_type = "cup"
+        self.csv_type = "league"
         self.properties = LEAGUE_GAME_PROPERTIES
         self.max_goals = GAME_SPECS.league_max_goals
 
