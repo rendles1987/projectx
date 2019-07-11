@@ -180,7 +180,7 @@ class BaseCsvCleaner:
         index_log_these_dates = log_these_dates.index.values
         # remove these rows from self.dataframe
         self.dataframe.drop(self.dataframe.index[index_log_these_dates], inplace=True)
-
+        self.dataframe.reset_index(inplace=True)
         self.add_to_invalid_df(log_these_dates, msg)
 
     def add_to_invalid_df(self, df_wrong, msg):
@@ -324,6 +324,7 @@ class BaseCsvCleaner:
         - if wrong? drop from df and add_to_invalid_df()
         :return:
         """
+
         column_name = "home_sheet"
         # if cell is nan, then incorrect_start is False. Why? As ~(na=True) returns False
 
@@ -356,6 +357,7 @@ class BaseCsvCleaner:
             self.dataframe.drop(
                 self.dataframe.index[index_incorrect_bracket], inplace=True
             )
+            self.dataframe.reset_index(inplace=True)
             self.add_to_invalid_df(incorrect_bracket, msg)
 
     def check_sheet_count(self):
@@ -383,6 +385,7 @@ class BaseCsvCleaner:
             self.dataframe.drop(
                 self.dataframe.index[index_df_too_many_players], inplace=True
             )
+            self.dataframe.reset_index(inplace=True)
             self.add_to_invalid_df(df_too_many_players, msg)
 
     def check_sheets_intersection(self):
@@ -475,8 +478,8 @@ class BaseCsvCleaner:
             index_players_coaches_not_unique
         )
         if len(all_wrong_index) > 0:
-            # self.dataframe.drop(self.dataframe.index[all_wrong_index], inplace=True)
             self.dataframe.drop(self.dataframe.loc[all_wrong_index].index, inplace=True)
+            self.dataframe.reset_index(inplace=True)
 
     def save_changes(self):
         """ remove orig file and save self.dataframe to orig file filepath """
@@ -688,6 +691,7 @@ class CupCsvCleaner(BaseCsvCleaner):
 
         # delete rows that have invalid scores
         self.dataframe.drop(self.dataframe.index[list(index_msg_mapping)], inplace=True)
+        self.dataframe.reset_index(inplace=True)
 
         if is_panda_df_empty(self.dataframe_invalid):
             self.dataframe_invalid = df_log_these_scores

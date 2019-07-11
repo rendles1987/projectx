@@ -10,17 +10,19 @@ from tools.csv_importer.filename_checker import CupFilenameChecker
 from tools.csv_importer.filename_checker import LeagueFilenameChecker
 from tools.csv_importer.raw_csv_importer import check_nan_fix_required
 from tools.csv_importer.raw_csv_importer import CupCsvImporter
+from tools.csv_importer.raw_csv_importer import df_to_csv
 from tools.csv_importer.raw_csv_importer import fix_nan_values
+from tools.csv_importer.raw_csv_importer import get_df_fix_managers
+from tools.csv_importer.raw_csv_importer import get_df_fix_players
 from tools.csv_importer.raw_csv_importer import LeagueCsvImporter
-from tools.csv_importer.raw_csv_importer import remove_tab_strings
 from tools.csv_importer.raw_csv_importer import possible_fix_delimeter_type
+from tools.csv_importer.raw_csv_importer import remove_tab_strings
 from tools.csv_merger.csv_enricher import CupCsvEnricher
 from tools.csv_merger.csv_enricher import LeagueCsvEnricher
 from tools.csv_merger.csv_merger import MergeCsvToSqlite
 from tools.sqlite_teams.club_stats import ManageTeamStats
 from tools.sqlite_teams.teams_unique import TeamsUnique
 from tools.sqlite_teams.teams_unique import UpdateGamesWithIds
-from tools.csv_importer.raw_csv_importer import df_fix_players, df_to_csv
 
 import logging
 import os
@@ -199,11 +201,19 @@ class ProcessController:
             #         raise AssertionError("I only expected nan error in cup csvs..")
 
     def fix_player_sheets(self):
-        log.info("correct_nan_in_csv")
+        log.info("fix players sheets")
         import_csv_info = ImportCsvInfo()
         for csv_type, csv_file_path in import_csv_info.csv_info:
             if csv_type in ["cup", "league"]:
-                df = df_fix_players(csv_file_path)
+                df = get_df_fix_players(csv_file_path, df=None)
+                df_to_csv(df, csv_file_path)  # replace if exists
+
+    def fix_managers(self):
+        log.info("fix managers")
+        import_csv_info = ImportCsvInfo()
+        for csv_type, csv_file_path in import_csv_info.csv_info:
+            if csv_type in ["cup", "league"]:
+                df = get_df_fix_managers(csv_file_path)
                 df_to_csv(df, csv_file_path)  # replace if exists
 
     def remove_tab_strings_from_df(self):
@@ -293,6 +303,7 @@ class ProcessController:
         self.correct_delimeter_type()
         self.correct_nan_in_csv()  # noqa only for cup csv: shifts empty cells in cup csv to right and adds 'NA' to empty cell
         self.fix_player_sheets()
+        self.fix_managers()
         self.remove_tab_strings_from_df()  # noqa replace strings like '\t' with '', overwrites existing raw_csv
         self.convert_csv_data()
 

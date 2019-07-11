@@ -1,18 +1,21 @@
 from tools.constants import BASE_GAME_PROPERTIES
+from tools.constants import COMMA_DELIMETER
 from tools.constants import CUP_GAME_PROPERTIES
 from tools.constants import DTYPES
 from tools.constants import LEAGUE_GAME_PROPERTIES
 from tools.constants import PLAYER_PROPERTIES
-from tools.constants import TEMP_DIR, TAB_DELIMETER, COMMA_DELIMETER
+from tools.constants import TAB_DELIMETER
+from tools.constants import TEMP_DIR
 from tools.csv_importer.check_result import CheckResults
 from tools.utils import df_to_csv
 from tools.utils import ensure_corect_date_format
 from tools.utils import is_panda_df_empty
 
 import logging
+import numpy as np
 import os
 import pandas as pd
-import numpy as np
+
 
 log = logging.getLogger(__name__)
 
@@ -198,11 +201,11 @@ def fix_nan_values(csv_path):
         else:
             new_df = pd.concat([new_df, row_copy], ignore_index=True)
 
-    df = df_fix_players(csv_path, df=new_df)
+    df = get_df_fix_players(csv_path, df=new_df)
     df_to_csv(df, csv_path)  # replace if exists
 
 
-def df_fix_players(csv_path, df=None):
+def get_df_fix_players(csv_path, df=None):
     if is_panda_df_empty(df):
         df = pd.read_csv(csv_path, sep=TAB_DELIMETER)
     fix_needed, index_wrong = fix_needed_players_sheets_in_one_column(csv_path, df)
@@ -285,11 +288,23 @@ def fix_players_sheets(new_df, csv_path, index_wrong):
     return new_df
 
 
+def get_df_fix_managers(csv_file_path):
+    """manager cell may not startwith '[' and endwith ']'. If so, change cell to np.Nan """
+    df = pd.read_csv(csv_file_path, sep=TAB_DELIMETER)
+    for manager in ["home_manager", "away_manager"]:
+        all_managers_nan = df[manager].isna().all()
+        if not all_managers_nan:
+            mask_home_manager_wrong = df[manager].str.startswith("[", na=False) | df[
+                manager
+            ].str.endswith("]", na=False)
+            df.loc[mask_home_manager_wrong, manager] = np.NaN
+    return df
+
+
 def fix_needed_players_sheets_in_one_column(csv_path, df):
-    """Check if players (away_sheet and home_sheet) are in one column and not
-    spread out over multiple columns. Check per row:
-    - column ((away_sheet and home_sheet) must have minimal length of 90 chars
-    - only check if column 'url' startswith 'hhtp'
+    """Check if the _sheet columns are closed by brackets. If not (and url startswith 'http')
+    then that row is wrong.
+    :param csv_path
     :param df:
     :return:    fix_is_needed --> boolean
                 index_true --> pd.Index() (indices of df rows which must be fixed)
@@ -298,9 +313,7 @@ def fix_needed_players_sheets_in_one_column(csv_path, df):
     for bracket_type in ["opening", "closing"]:
         # check_count_brackets raise AssertionError if nr bracket is wrong
         check_count_brackets(df, csv_path, bracket_type=bracket_type)
-
     df_obj = df.select_dtypes(["object"])
-
     # create same size panda df filled with False
     df_obj_closed_by_bracket = pd.DataFrame(
         False, index=np.arange(len(df_obj)), columns=df_obj.columns
@@ -316,9 +329,7 @@ def fix_needed_players_sheets_in_one_column(csv_path, df):
     mask_sheets_okay = (
         df_obj_closed_by_bracket["home_sheet"] & df_obj_closed_by_bracket["away_sheet"]
     )
-
     mask_url_startswith_http = df["url"].str.startswith("http")
-
     # we can only expect sheets with brackets is url starts with http
     mask_wrong = mask_url_startswith_http & ~mask_sheets_okay
     idx_wrong = mask_wrong[mask_wrong].index
