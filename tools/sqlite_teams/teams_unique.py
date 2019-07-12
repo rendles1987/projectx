@@ -6,7 +6,7 @@ from tools.constants import SQLITE_FULL_PATH
 from tools.constants import TABLE_NAME_ALL_GAMES
 from tools.constants import TABLE_NAME_ALL_GAMES_WITH_IDS
 from tools.constants import TABLE_NAME_ALL_TEAMS
-from tools.utils import df_to_sqlite_table
+from tools.utils import df_to_sqlite_table, compress_df
 from tools.utils import sqlite_table_to_df
 
 import logging
@@ -54,7 +54,7 @@ class TeamsUnique:
         teams_known_country.drop_duplicates(inplace=True)
 
         unique_team_country = pd.concat([teams_known_country, teams_unknown_country])
-        unique_team_country.reset_index(drop=True, inplace=True)
+        unique_team_country.reset_index(inplace=True, drop=True)
 
         return unique_team_country
 
@@ -219,7 +219,7 @@ class TeamsUnique:
 
     def add_id_column(self, df_unique_team_country):
         # add an 'id' column
-        df_unique_team_country = df_unique_team_country.reset_index(drop=True)
+        df_unique_team_country.reset_index(inplace=True, drop=True)
         df_unique_team_country["id"] = df_unique_team_country.index
         return df_unique_team_country
 
@@ -311,16 +311,6 @@ class UpdateGamesWithIds:
                     df[col] = df[col].astype(int)
         return df
 
-    def compress_df(self, df):
-        """Downcast integer and float dyptes to smallest (aim is to compress sqlite)
-        Downcast from int64 to uint8 (if possible) and from float64 to float32 """
-        search_types = ["integer", "float"]
-        for search_type in search_types:
-            existing_type_columns = df.select_dtypes(include=[search_type]).columns
-            for col in existing_type_columns:
-                df[col] = pd.to_numeric(df[col], downcast=search_type)
-        return df
-
     def replace_table_all_games(self, df_games_with_team_game_id):
         # Opens file if exists, else creates file
         log.debug(f"connect to {SQLITE_FULL_PATH}")
@@ -340,7 +330,7 @@ class UpdateGamesWithIds:
         df_games_team_id = self.all_games_with_team_ids(df_all_games, df_all_teams)
         df_games_team_game_id = self.all_games_with_game_ids(df_games_team_id)
         df_convert = self.convert_dtypes_to_int(df_games_team_game_id)
-        df_compress = self.compress_df(df_convert)
+        df_compress = compress_df(df_convert)
         df_to_sqlite_table(
             df_compress, table_name=TABLE_NAME_ALL_GAMES_WITH_IDS, if_exists="replace"
         )

@@ -20,7 +20,7 @@ from tools.csv_importer.raw_csv_importer import remove_tab_strings
 from tools.csv_merger.csv_enricher import CupCsvEnricher
 from tools.csv_merger.csv_enricher import LeagueCsvEnricher
 from tools.csv_merger.csv_merger import MergeCsvToSqlite
-from tools.sqlite_teams.club_stats import ManageTeamStats
+from tools.sqlite_teams.club_stats import TeamStatsLongTerm
 from tools.sqlite_teams.teams_unique import TeamsUnique
 from tools.sqlite_teams.teams_unique import UpdateGamesWithIds
 
@@ -272,8 +272,8 @@ class ProcessController:
         update.run()
 
     def calculate_club_stats(sefl):
-        manage_club_stats = ManageTeamStats()
-        manage_club_stats.run()
+        team_stats_long_term = TeamStatsLongTerm()
+        team_stats_long_term.run()
 
     def link_players(self):
         pass
@@ -322,8 +322,8 @@ class ProcessController:
 
     def determine_teams(self):
         """ from here all happens in sqlite"""
-        self.create_unique_teams()
-        self.update_games_with_ids()
+        # self.create_unique_teams()
+        # self.update_games_with_ids()
         self.calculate_club_stats()
 
     def do_ml(self):
@@ -331,9 +331,9 @@ class ProcessController:
 
     def run(self):
         # self.do_scrape()  # scrap data (webpage --> raw)
-        self.do_import()  # import raw data (raw --> import)
-        self.do_clean()  # clean data (import --> clean)
-        self.do_merge()  # add 2 or 3 columns to clean and then merge to sqlite
+        # self.do_import()  # import raw data (raw --> import)
+        # self.do_clean()  # clean data (import --> clean)
+        # self.do_merge()  # add 2 or 3 columns to clean and then merge to sqlite
         self.determine_teams()
         # self.do_ml()
         log.info("shutting down")

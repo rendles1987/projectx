@@ -180,7 +180,8 @@ class BaseCsvCleaner:
         index_log_these_dates = log_these_dates.index.values
         # remove these rows from self.dataframe
         self.dataframe.drop(self.dataframe.index[index_log_these_dates], inplace=True)
-        self.dataframe.reset_index(inplace=True)
+        # reset, use the drop parameter to avoid the old index being added as a column
+        self.dataframe.reset_index(inplace=True, drop=True)
         self.add_to_invalid_df(log_these_dates, msg)
 
     def add_to_invalid_df(self, df_wrong, msg):
@@ -350,14 +351,12 @@ class BaseCsvCleaner:
         if mask_all.any():
             incorrect_bracket = self.dataframe[mask_all]
             index_incorrect_bracket = mask_all[mask_all].index
-            index_incorrect_bracket = incorrect_bracket.index.values
             msg = "home- or away sheet string doesnt start/end with bracket"
             log.error(f"{msg} {self.csv_file_name_without_extension}")
             # remove these rows from self.dataframe
-            self.dataframe.drop(
-                self.dataframe.index[index_incorrect_bracket], inplace=True
-            )
-            self.dataframe.reset_index(inplace=True)
+            self.dataframe.drop(index_incorrect_bracket, inplace=True)
+            # use the drop parameter to avoid the old index being added as a column
+            self.dataframe.reset_index(inplace=True, drop=True)
             self.add_to_invalid_df(incorrect_bracket, msg)
 
     def check_sheet_count(self):
@@ -385,7 +384,8 @@ class BaseCsvCleaner:
             self.dataframe.drop(
                 self.dataframe.index[index_df_too_many_players], inplace=True
             )
-            self.dataframe.reset_index(inplace=True)
+            # use drop=True to avoid the old index being added as a column
+            self.dataframe.reset_index(inplace=True, drop=True)
             self.add_to_invalid_df(df_too_many_players, msg)
 
     def check_sheets_intersection(self):
@@ -394,8 +394,8 @@ class BaseCsvCleaner:
         - 2: all 22 players + 2 managers names must be unique
         :return:
         """
-        # use the drop parameter to avoid the old index being added as a column
-        # self.dataframe.reset_index(drop=True)
+        # use drop=True to avoid the old index being added as a column
+        self.dataframe.reset_index(inplace=True, drop=True)
 
         home_only_nan = self.column_has_only_nan(self.dataframe["home_sheet"])
         away_only_nan = self.column_has_only_nan(self.dataframe["away_sheet"])
@@ -479,7 +479,8 @@ class BaseCsvCleaner:
         )
         if len(all_wrong_index) > 0:
             self.dataframe.drop(self.dataframe.loc[all_wrong_index].index, inplace=True)
-            self.dataframe.reset_index(inplace=True)
+            # use drop=True to avoid the old index being added as a column
+            self.dataframe.reset_index(inplace=True, drop=True)
 
     def save_changes(self):
         """ remove orig file and save self.dataframe to orig file filepath """
@@ -691,7 +692,8 @@ class CupCsvCleaner(BaseCsvCleaner):
 
         # delete rows that have invalid scores
         self.dataframe.drop(self.dataframe.index[list(index_msg_mapping)], inplace=True)
-        self.dataframe.reset_index(inplace=True)
+        # use drop=True to avoid the old index being added as a column
+        self.dataframe.reset_index(inplace=True, drop=True)
 
         if is_panda_df_empty(self.dataframe_invalid):
             self.dataframe_invalid = df_log_these_scores

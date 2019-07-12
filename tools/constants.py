@@ -8,9 +8,9 @@ DATEFORMAT_YYYYMMDD = "%Y-%m-%d"
 TABLE_NAME_ALL_TEAMS = "team_id_name_country"
 TABLE_NAME_ALL_GAMES = "all_games"
 TABLE_NAME_ALL_GAMES_WITH_IDS = "all_games_ids"
+TABLE_NAME_LONG_TERM_STATS  = "team_long_term_stats"
 
-
-use_temp = True
+use_temp = False
 if use_temp:
     RAW_CSV_DIRS = {
         "cup": "/work/data/temp_stuff/_01_raw/cup",

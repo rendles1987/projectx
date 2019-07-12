@@ -1,3 +1,5 @@
+import pandas
+
 from tools.constants import SQLITE_FULL_PATH
 
 import logging
@@ -118,3 +120,14 @@ def drop_table_if_exists_from_sqlite(table_name=None):
     query = """DROP TABLE IF EXISTS {};""".format(table_name)
     cursor.execute(query)
     connex.close()
+
+
+def compress_df(df):
+    """Downcast integer and float dyptes to smallest (aim is to compress sqlite)
+    Downcast from int64 to uint8 (if possible) and from float64 to float32 """
+    search_types = ["integer", "float"]
+    for search_type in search_types:
+        existing_type_columns = df.select_dtypes(include=[search_type]).columns
+        for col in existing_type_columns:
+            df[col] = pd.to_numeric(df[col], downcast=search_type)
+    return df
