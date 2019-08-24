@@ -87,7 +87,27 @@ class CleanCsvInfo(RawCsvInfo):
 
     def get_all_csv(self):
         return [
-            (game_type, csv)
-            for [game_type, csv] in self.csv_info
-            if csv.endswith(".csv")
+            (csv_type, full_path)
+            for [csv_type, full_path] in self.csv_info
+            if full_path.endswith(".csv")
+        ]
+
+    def count_total_valid_csv(self):
+        return len(self.get_all_valid_csv())
+
+    def get_all_valid_csv(self):
+        return [
+            (csv_type, full_path)
+            for [csv_type, full_path] in self.csv_info
+            if full_path.endswith("_valid.csv")
+        ]
+
+    def count_total_invalid_csv(self):
+        return len(self.get_all_invalid_csv())
+
+    def get_all_invalid_csv(self):
+        return [
+            (csv_type, full_path)
+            for [csv_type, full_path] in self.csv_info
+            if full_path.endswith("_invalid.csv")
         ]

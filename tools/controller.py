@@ -3,6 +3,7 @@ from tools.constants import IMPORT_CSV_DIRS
 from tools.constants import RAW_CSV_DIRS
 from tools.csv_cleaner.csv_cleaner import CupCsvCleaner
 from tools.csv_cleaner.csv_cleaner import LeagueCsvCleaner
+from tools.csv_cleaner.repair_invalid_cleaned import RepairInvalidCleaned
 from tools.csv_dir_info import CleanCsvInfo
 from tools.csv_dir_info import ImportCsvInfo
 from tools.csv_dir_info import RawCsvInfo
@@ -20,7 +21,7 @@ from tools.csv_importer.raw_csv_importer import remove_tab_strings
 from tools.csv_merger.csv_enricher import CupCsvEnricher
 from tools.csv_merger.csv_enricher import LeagueCsvEnricher
 from tools.csv_merger.csv_merger import MergeCsvToSqlite
-from tools.sqlite_teams.club_stats import TeamStatsLongTerm
+from tools.sqlite_teams.club_stats import TeamStatsLongTerm, TeamStatsShortTerm
 from tools.sqlite_teams.teams_unique import TeamsUnique
 from tools.sqlite_teams.teams_unique import UpdateGamesWithIds
 
@@ -86,6 +87,22 @@ class ProcessController:
         log.info("check if 1 or more valid import data files exists")
         import_csv_info = ImportCsvInfo()
         assert import_csv_info.count_total_valid_csv() > 0
+
+    @staticmethod
+    def check_invalid_clean_data_exists():
+        log.info("check if 1 or more invalid clean data files exists")
+        clean_csv_info = CleanCsvInfo()
+        nr_invalid_clean_csvs = clean_csv_info.count_total_invalid_csv()
+        log.info(f"nr_invalid_clean_csvs found: {nr_invalid_clean_csvs}")
+        return nr_invalid_clean_csvs > 0
+
+    @staticmethod
+    def repair_invalid_clean_data():
+        log.info("repairing invalid clean data")
+        clean_csv_info = CleanCsvInfo()
+        for csv_type, full_path in clean_csv_info.get_all_invalid_csv():
+            repair = RepairInvalidCleaned(csv_type, full_path)
+            repair.run()
 
     @staticmethod
     def empty_import_dirs():
@@ -274,6 +291,8 @@ class ProcessController:
     def calculate_club_stats(sefl):
         team_stats_long_term = TeamStatsLongTerm()
         team_stats_long_term.run()
+        team_stats_short_term = TeamStatsShortTerm()
+        team_stats_short_term.run()
 
     def link_players(self):
         pass
@@ -314,6 +333,12 @@ class ProcessController:
         self.copy_valid_import_to_clean()
         self.clean()
 
+    def do_repair_invalid_clean(self):
+        """repair all invalid csvs in folder 'clean' (as a result of 'do_clean()'"""
+        self.check_dirs_exist(self.clean_dirs)  # raise if not exists
+        if self.check_invalid_clean_data_exists():
+            self.repair_invalid_clean_data()
+
     def do_merge(self):
         """Before we merge all csvs to sqlite, we add columns 1) game_type,
         2) game_name, 3) season """
@@ -333,7 +358,8 @@ class ProcessController:
         # self.do_scrape()  # scrap data (webpage --> raw)
         # self.do_import()  # import raw data (raw --> import)
         # self.do_clean()  # clean data (import --> clean)
+        self.do_repair_invalid_clean()
         # self.do_merge()  # add 2 or 3 columns to clean and then merge to sqlite
-        self.determine_teams()
+        # self.determine_teams()
         # self.do_ml()
         log.info("shutting down")

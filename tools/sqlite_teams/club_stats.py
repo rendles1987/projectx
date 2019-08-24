@@ -1,10 +1,14 @@
-from tools.constants import TABLE_NAME_ALL_GAMES_WITH_IDS
-from tools.constants import TABLE_NAME_LONG_TERM_STATS
+from tools.constants import (
+    TABLE_NAME_ALL_GAMES_WITH_IDS,
+    TABLE_NAME_LONG_TERM_STATS,
+    GAMENAME_ID_LEAGUE,
+    ALL_GAMEID_NAME_MAPPING,
+    ALL_GAMEID_COUNTRY_MAPPING,
+)
+import math
 from tools.utils import sqlite_table_to_df, compress_df, df_to_sqlite_table
 
 import logging
-import pandas as pd
-
 
 log = logging.getLogger(__name__)
 
@@ -24,6 +28,10 @@ log = logging.getLogger(__name__)
 """
 
 
+class TeamStatsShortTerm:
+    pass
+
+
 class TeamStatsLongTerm:
     """
     ultimate dataframe setup for AI with columns:
@@ -39,7 +47,7 @@ class TeamStatsLongTerm:
     ------------
     MOOD
     ------------
-    mood of the team (coach, players, public opion, etc) is a function of:
+    mood of the team (coach, players, public opinion, etc) is a function of:
     - 1. league: current avg_points (per game) compared to long term avg_points (per game) in previous years
     - 2. league: current avg_gf (per game) compared to long term avg_gf (per game) in previous years
     - 3. league: current avg_ga (per game) compared to long term avg_ga (per game) in previous years
@@ -92,12 +100,47 @@ class TeamStatsLongTerm:
     def __init__(self):
         pass
 
-    def get_nr_games(self, df_games):
-        """Get nr games (home and away games seperated) per team_id, season, game_name_id"""
+    def get_json_data(self):
+        my_url = 'https://www.worldfootball.net/report/ligue-1-2006-2007-as-monaco-osc-lille/'
 
-        """
+        new_url = "https://securepubads.g.doubleclick.net/gampad/ads?gdfp_req=1&pvsid=324009158373288&correlator=3197424626384405&output=ldjh&callback=googletag.impl.pubads.callbackProxy1&impl=fif&eid=21062452%2C21063637%2C21063965&vrg=2019081501&guci=1.2.0.0.2.2.0.0&plat=1%3A32776%2C2%3A16809992%2C8%3A134250504&sc=1&sfv=1-0-35&ecs=20190823&iu=%2F53015287%2Fworldfootball.net_d_728x90_1&sz=728x90&cookie_enabled=1&bc=31&abxe=1&lmt=1566557988&dt=1566557988034&dlt=1566557987294&idt=671&frm=20&biw=1838&bih=981&oid=3&adx=-12245933&ady=-12245933&adk=1295409359&uci=1&ifi=1&u_tz=120&u_his=3&u_h=1080&u_w=1920&u_ah=1053&u_aw=1853&u_cd=24&u_nplug=3&u_nmime=4&u_sd=1&flash=0&url=https%3A%2F%2Fwww.worldfootball.net%2Freport%2Fligue-1-2006-2007-as-monaco-osc-lille%2F&dssz=32&icsg=554&std=0&vis=1&dmc=8&scr_x=0&scr_y=0&psz=0x0&msz=0x0&blev=0.96&bisch=1&ga_vid=1688681370.1566552801&ga_sid=1566557988&ga_hid=1798167071&fws=128&ohw=0"
+
+        import requests
+
+
+
+
+        # shots_url = 'http://stats.nba.com/stats/playerdashptshotlog?' + \
+        #             'DateFrom=&DateTo=&GameSegment=&LastNGames=0&LeagueID=00&' + \
+        #             'Location=&Month=0&OpponentTeamID=0&Outcome=&Period=0&' + \
+        #             'PlayerID=202322&Season=2014-15&SeasonSegment=&' + \
+        #             'SeasonType=Regular+Season&TeamID=0&VsConference=&VsDivision='
+
+        # request the URL and parse the JSON
+        response = requests.get(new_url)
+        response.raise_for_status()  # raise exception if invalid response
+        blaaaat = response.json()
+
+        shots = response.json()['resultSets'][0]['rowSet']
+
+
+
+        response = requests.get(my_url)
+        data = response.json()
+
+
+        import urllib.request
+        import json
+        with urllib.request.urlopen(my_url) as url:
+            data = json.loads(url.read().decode())
+            print(data)
+
+
+    def get_nr_games(self, df_games):
+        """Calculate nr games (home and away games separated) per team_id, season,
+        game_name_id. This is done for league as well as cup.
+
         Example:
-        
         raw_data = {
             "date": pd.to_datetime(
                 [
@@ -126,15 +169,15 @@ class TeamStatsLongTerm:
         )
         
         This input should return df_nr_games:
-        #    team_id  season  game_name_id  nr_games_home  nr_games_away
-        # 0        1       1             1            1.0            NaN
-        # 1        1       2             2            2.0            NaN
-        # 2        2       1             1            3.0            1.0
-        # 3        2       2             2            2.0            1.0
-        # 4        3       1             1            2.0            2.0
-        # 5        3       2             2            1.0            2.0
-        # 6        4       2             2            1.0            3.0
-        # 7        4       1             1            NaN            3.0
+        #    team_id  season  game_name_id  nr_games_home  nr_games_away  nr_games_total
+        # 0        1       1             1            1.0            NaN  1.0
+        # 1        1       2             2            2.0            NaN  2.0
+        # 2        2       1             1            3.0            1.0  3.0
+        # 3        2       2             2            2.0            1.0  3.0
+        # 4        3       1             1            2.0            2.0  4.0
+        # 5        3       2             2            1.0            2.0  3.0
+        # 6        4       2             2            1.0            3.0  4.0
+        # 7        4       1             1            NaN            3.0  3.0
         """
 
         for col in ["home_id", "away_id", "season", "game_name_id"]:
@@ -154,6 +197,174 @@ class TeamStatsLongTerm:
             how="outer",
             suffixes=("_home", "_away"),
         )
+
+        # sum two columns. Nan (is possible in cup matches!!) becomes zero
+        df_nr_games["nr_games_total"] = df_nr_games["nr_games_home"].fillna(
+            0
+        ) + df_nr_games["nr_games_away"].fillna(0)
+        assert not df_nr_games["nr_games_total"].hasnans
+
+        # Check if nr_games do make sense: the nr of league games in 1 season should
+        # be equal for all teams
+        # 1. get only league games
+        df_league_games = df_nr_games[
+            df_nr_games["game_name_id"].isin(GAMENAME_ID_LEAGUE)
+        ]
+        df_group_by = df_league_games.groupby(
+            ["season", "game_name_id", "nr_games_total"]
+        )
+        df_too_few_games = df_group_by.size().reset_index(name="nr_teams")
+        df_too_few_games.sort_values(
+            by=["game_name_id", "season"], ascending=True, inplace=True
+        )
+
+        # Now, lets calc how many games are in the group_by (season and game_name_id)
+        df_too_few_games["nr_teams_total"] = df_too_few_games.groupby(
+            ["season", "game_name_id"]
+        )["nr_teams"].transform("sum")
+        # calc expected number of games
+        df_too_few_games["exp_nr_games"] = (df_too_few_games["nr_teams_total"] - 1) * 2
+        df_too_few_games.reset_index(inplace=True, drop=True)
+
+        # df_too_few_games output below:
+        # Seasons 2000, 2001, 2002, and 2003 are okay for game_name_id=1.
+        # Season 2004 and 2005 are not okay! In 2004:
+        # 2 teams played 36 games, 2 teams played 37 games, 16 teams played 38 games
+        """
+        season  game_name_id  nr_games_total nr_teams  nr_teams_total  exp_nr_games
+        2000.0             1              38       20              20            38
+        2001.0             1              38       20              20            38
+        2002.0             1              38       20              20            38
+        2003.0             1              38       20              20            38
+        
+        2004.0             1              36        2              20            38
+        2004.0             1              37        2              20            38
+        2004.0             1              38       16              20            38
+        
+        2005.0             1              35        2              20            38
+        2005.0             1              36        3              20            38
+        2005.0             1              37        8              20            38
+        2005.0             1              38        7              20            38
+        
+        2006.0             1              34        1              20            38 
+        """
+
+        # get sum of the number of missing games.
+        df_too_few_games["missing_games"] = (
+            df_too_few_games["exp_nr_games"] - df_too_few_games["nr_games_total"]
+        ) * df_too_few_games["nr_teams"]
+
+        # calc how many games are missing in the group_by (season and game_name_id)
+        df_too_few_games["missing_games_total"] = df_too_few_games.groupby(
+            ["season", "game_name_id"]
+        )["missing_games"].transform("sum")
+        assert all(df_too_few_games["missing_games_total"] % 2 == 0)
+
+        # total_missing_games = sum(df_too_few_games["missing_games"])
+        # print("total_missing_games:" + str(total_missing_games))
+
+        columns = ["season", "game_name_id", "exp_nr_games", "missing_games_total"]
+        df_log = df_too_few_games[columns].copy()
+        df_log.drop_duplicates(
+            subset=["season", "game_name_id"], keep="first", inplace=True
+        )
+        nr_teams = df_log['exp_nr_games'] / 2 + 1
+        # calc total nr games of whole competition
+        df_log['exp_nr_games'] = (nr_teams * (nr_teams+1)) / 2  # binomial coefficient
+        # only select rows when missing_games_total > 0
+        df_log = df_log[df_log["missing_games_total"] > 0]
+        # total_nr_games = (nr_teams * (nr_teams+1)) / 2
+        df_log["season"] = df_log["season"].astype(int)
+        df_log["missing_games_total"] = df_log["missing_games_total"].astype(int)
+        # convert game_name_id to string
+
+        df_log["country"] = df_log["game_name_id"]
+        df_log["game_name_id"] = df_log["game_name_id"].replace(ALL_GAMEID_NAME_MAPPING)
+        df_log["country"] = df_log["country"].replace(ALL_GAMEID_COUNTRY_MAPPING)
+        df_log.to_csv(
+            path_or_buf="/work/data/missing_games.txt",
+            header=True,
+            index=None,
+            sep=",",
+            mode="w",
+        )
+        print("hoi")
+        # 2) Then we get de specific id of teams that played to few games
+
+    def test(self, nr_teams):
+        """
+        Factorial, but with addition <-- is called bionimal coefficient
+        :param nr_teams:
+        :return: total_nr_games of whole competition
+        """
+        total_nr_games = (nr_teams * (nr_teams+1)) / 2
+        return total_nr_games
+
+
+        #
+        # df_sum_games["joinn"] = df_sum_games["season"].map(str) + df_sum_games[
+        #     "game_name_id"
+        # ].map(str)
+        # df_too_few_games["joinn"] = df_too_few_games["season"].map(
+        #     str
+        # ) + df_too_few_games["game_name_id"].map(str)
+        #
+        # df_too_few_games.set_index(["season", "game_name_id"], inplace=True)
+        # df_sum_games.set_index(["season", "game_name_id"], inplace=True)
+        # df_too_few_games.update(df_sum_games)
+        # df_too_few_games.reset_index(inplace=True)
+        #
+        # df_too_few_games["nr_expec_games"] = df_sum_games
+
+        """
+        >> > df1.set_index('Code', inplace=True)
+        >> > df1.update(df2.set_index('Code'))
+        >> > df1.reset_index()  # to recover the initial structure
+        """
+
+        # df_too_few_games["nr_expec_games"] = df_too_few_games.groupby(
+        #     ["season", "game_name_id"]
+        # ).sum()
+        #
+        # df_too_few_games.sum(label="nr_teams", axis=0)
+
+        # to get the ids of those teams (who played too few games) we do the following:
+        # 1) determine how many games should be played.
+        # aggregations = {"nr_games_total": "max", "nr_teams": ["max", "count"]}
+        # columns = ["season", "game_name_id"]
+        # df_expect_max_games = df_too_few_games.groupby(columns).agg(aggregations)
+        # df_expect_max_games.sort_values(by=["game_name_id", "season"], inplace=True)
+        # df_expect_max_games.reset_index(level=columns, inplace=True)
+        #      season game_name_id nr_games_total nr_teams
+        #                                     max      max count
+        # 0    2000.0            1           38.0       20     1
+        # 1    2001.0            1           38.0       20     1
+        # 2    2002.0            1           38.0       20     1
+        # 3    2003.0            1           38.0       20     1
+        # 4    2004.0            1           38.0       16     3
+        # 5    2005.0            1           38.0        8     4
+        # we see that in seasons 2000, 2001, 2002 and 2003 that count(nr_teams) is 1:
+        # there is only 1 group of (20) teams which all played 38 games. However, in
+        # season 2004, 3 groups exists which played different nr of games. The
+        # majority (16 teams) played 38 games.
+
+        # f_first_last_gamedates.reset_index(level=columns, inplace=True, drop=False)
+
+        print("hoi")
+
+        # (df_obj_count_bracket > 1).sum(axis=1)
+
+        #         aggregations = {
+        #             "home_points": ["sum", "mean"],
+        #             "home_goals": ["sum"],
+        #             "away_goals": ["sum"],  # goals against in home games
+        #         }
+        #         columns = ["home_id", "season", "game_name_id"]
+        #         home_stats = df_games.groupby(columns).agg(aggregations)
+
+        # df_nr_games
+        league_game_ids = GAMENAME_ID_LEAGUE
+
         return df_nr_games
 
     def get_home_points_gf_ga(self, df_games):
@@ -182,14 +393,19 @@ class TeamStatsLongTerm:
         #     A_x A_y B_y
         # 0   1   2   8
         # 1   3   4   9
-        home_stats.columns = ['_'.join(col) for col in home_stats.columns]
+        home_stats.columns = ["_".join(col) for col in home_stats.columns]
         home_stats.reset_index(level=columns, inplace=True, drop=False)
-        home_stats.rename(index=str, columns={"home_id": "team_id",
-                                              "home_points_sum": "points_sum",
-                                              "home_points_mean": "points_mean",
-                                              "home_goals_sum": "gf",
-                                              "away_goals_sum": "ga"
-                                              }, inplace=True)
+        home_stats.rename(
+            index=str,
+            columns={
+                "home_id": "team_id",
+                "home_points_sum": "points_sum",
+                "home_points_mean": "points_mean",
+                "home_goals_sum": "gf",
+                "away_goals_sum": "ga",
+            },
+            inplace=True,
+        )
         return home_stats
 
     def get_away_points_gf_ga(self, df_games):
@@ -201,30 +417,45 @@ class TeamStatsLongTerm:
         }
         columns = ["away_id", "season", "game_name_id"]
         away_stats = df_games.groupby(columns).agg(aggregations)
-        away_stats.columns = ['_'.join(col) for col in away_stats.columns]
+        away_stats.columns = ["_".join(col) for col in away_stats.columns]
         away_stats.reset_index(level=columns, inplace=True, drop=False)
-        away_stats.rename(index=str, columns={"away_id": "team_id",
-                                              "away_points_sum": "points_sum",
-                                              "away_points_mean": "points_mean",
-                                              "away_goals_sum": "gf",
-                                              "home_goals_sum": "ga"
-                                              }, inplace=True)
+        away_stats.rename(
+            index=str,
+            columns={
+                "away_id": "team_id",
+                "away_points_sum": "points_sum",
+                "away_points_mean": "points_mean",
+                "away_goals_sum": "gf",
+                "home_goals_sum": "ga",
+            },
+            inplace=True,
+        )
         return away_stats
 
     def update_with_points_gf_ga(self, df_nr_games, df_games):
         """Update df_nr_games with column 'points', 'gf', 'ga' """
         for col in ["home_id", "away_id", "season", "game_name_id"]:
             assert col in df_games.columns
-        for col in ["team_id", "season", "game_name_id", "nr_games_home", "nr_games_away"]:
+        for col in [
+            "team_id",
+            "season",
+            "game_name_id",
+            "nr_games_home",
+            "nr_games_away",
+        ]:
             assert col in df_nr_games.columns
 
         # first add two tmp columns
-        df_games.loc[df_games['home_goals'] > df_games['away_goals'], 'home_points'] = 3
-        df_games.loc[df_games['home_goals'] > df_games['away_goals'], 'away_points'] = 0
-        df_games.loc[df_games['home_goals'] == df_games['away_goals'], 'home_points'] = 1
-        df_games.loc[df_games['home_goals'] == df_games['away_goals'], 'away_points'] = 1
-        df_games.loc[df_games['home_goals'] < df_games['away_goals'], 'home_points'] = 3
-        df_games.loc[df_games['home_goals'] < df_games['away_goals'], 'away_points'] = 0
+        df_games.loc[df_games["home_goals"] > df_games["away_goals"], "home_points"] = 3
+        df_games.loc[df_games["home_goals"] > df_games["away_goals"], "away_points"] = 0
+        df_games.loc[
+            df_games["home_goals"] == df_games["away_goals"], "home_points"
+        ] = 1
+        df_games.loc[
+            df_games["home_goals"] == df_games["away_goals"], "away_points"
+        ] = 1
+        df_games.loc[df_games["home_goals"] < df_games["away_goals"], "home_points"] = 3
+        df_games.loc[df_games["home_goals"] < df_games["away_goals"], "away_points"] = 0
 
         home_stats = self.get_home_points_gf_ga(df_games)
         away_stats = self.get_away_points_gf_ga(df_games)
@@ -252,20 +483,15 @@ class TeamStatsLongTerm:
         in that season in that game_name_id
         :return: df
         """
-        aggregations = {
-            "team_id": "count"  # count nr teams of teams particpating
-        }
+        aggregations = {"team_id": "count"}  # count nr teams of teams particpating
 
         columns = ["season", "game_name_id"]
         df_count_teams = df_nr_games_stats.groupby(columns).agg(aggregations)
         df_count_teams.reset_index(level=columns, inplace=True)
         df_count_teams.rename(index=str, columns={"team_id": "nr_teams"}, inplace=True)
 
-
         df_nr_games_stats_nr_games = df_nr_games_stats.merge(
-            df_count_teams,
-            how="outer",
-            on=["season", "game_name_id"],
+            df_count_teams, how="outer", on=["season", "game_name_id"]
         )
         return df_nr_games_stats_nr_games
 
@@ -311,22 +537,33 @@ class TeamStatsLongTerm:
 
         columns = ["season", "game_name_id"]
         df_first_last_gamedates = df_games.groupby(columns).agg(aggregations)
-        df_first_last_gamedates.columns = ['_'.join(col) for col in df_first_last_gamedates.columns]
+        df_first_last_gamedates.columns = [
+            "_".join(col) for col in df_first_last_gamedates.columns
+        ]
         df_first_last_gamedates.reset_index(level=columns, inplace=True, drop=False)
-        df_first_last_gamedates.rename(index=str, columns={"game_name_id_count": "nr_games"}, inplace=True)
+        df_first_last_gamedates.rename(
+            index=str, columns={"game_name_id_count": "nr_games"}, inplace=True
+        )
         df_merge = df_nr_games_stats.merge(
-            df_first_last_gamedates,
-            how="inner",
-            on=["season", "game_name_id"])
+            df_first_last_gamedates, how="inner", on=["season", "game_name_id"]
+        )
         return df_merge
 
     def run(self):
+        self.get_json_data()
         df_games = sqlite_table_to_df(table_name=TABLE_NAME_ALL_GAMES_WITH_IDS)
         df_nr_games = self.get_nr_games(df_games)
+        self.checker.check_nr_games(df_nr_games)
         df_long_term_stats = self.update_with_points_gf_ga(df_nr_games, df_games)
         df_long_term_stats = self.update_with_nr_teams(df_long_term_stats)
-        df_long_term_stats = self.update_with_first_last_dates(df_long_term_stats, df_games)
-        df_to_sqlite_table(df_long_term_stats, table_name=TABLE_NAME_LONG_TERM_STATS, if_exists='replace')
+        df_long_term_stats = self.update_with_first_last_dates(
+            df_long_term_stats, df_games
+        )
+        df_to_sqlite_table(
+            df_long_term_stats,
+            table_name=TABLE_NAME_LONG_TERM_STATS,
+            if_exists="replace",
+        )
 
 
 class TeamStats:

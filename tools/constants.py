@@ -8,9 +8,9 @@ DATEFORMAT_YYYYMMDD = "%Y-%m-%d"
 TABLE_NAME_ALL_TEAMS = "team_id_name_country"
 TABLE_NAME_ALL_GAMES = "all_games"
 TABLE_NAME_ALL_GAMES_WITH_IDS = "all_games_ids"
-TABLE_NAME_LONG_TERM_STATS  = "team_long_term_stats"
+TABLE_NAME_LONG_TERM_STATS = "team_long_term_stats"
 
-use_temp = False
+use_temp = True
 if use_temp:
     RAW_CSV_DIRS = {
         "cup": "/work/data/temp_stuff/_01_raw/cup",
@@ -150,10 +150,16 @@ CUP_COUNTRIES = list(set([x.country for x in GAMES if x.type == "cup"]))
 LEAGUE_COUNTRIES = list(set([x.country for x in GAMES if x.type == "league"]))
 
 ALL_GAMENAME_ID_MAPPING = {x.name: x.id for x in GAMES}
+# {'premier_league': 1, 'championship': 2, ..etc}
 ALL_GAMEID_NAME_MAPPING = {x.id: x.name for x in GAMES}
+# {1: 'premier_league', 2: 'championship', ..etc}
+ALL_GAMEID_COUNTRY_MAPPING = {x.id: x.country for x in GAMES}
+# {1: 'eng', 2: 'eng', ..etc}
+GAMENAME_ID_LEAGUE = {x.id for x in GAMES if x.type == "league"}
+GAMENAME_ID_CUP = {x.id for x in GAMES if x.type == "cup"}
+# {1: 'league', 2: 'league', ..etc} <-- 1 is 'premier league', 2 is championship
 
 GAMETYPE_ID_MAPPING = {"league": 1, "cup": 2}
-
 COUNTRY_ID_MAPPING = {
     "ned": 1,
     "ita": 2,

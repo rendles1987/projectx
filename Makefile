@@ -10,4 +10,3 @@ beautiful:
 	isort -y
 	black .
 	flake8 .
-
