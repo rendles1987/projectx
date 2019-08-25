@@ -58,7 +58,9 @@ def detect_delimeter_type(csv_type, csv_file_full_path):
 def possible_fix_delimeter_type(csv_type, csv_path):
     delimiter_type = detect_delimeter_type(csv_type, csv_path)
     if delimiter_type not in [TAB_DELIMETER, COMMA_DELIMETER]:
-        log.critical(f"unsupported delimeter type {delimiter_type} {csv_path}")
+        msg = "unsupported delimeter type:" + str(delimiter_type) + str(csv_path)
+        log.critical(msg)
+        raise AssertionError(msg)
     if delimiter_type != TAB_DELIMETER:
         # we need to fix delimeter type
         log.info(f"incorrect delimeter type {delimiter_type} found for csv {csv_path}")
@@ -535,11 +537,12 @@ class BaseCsvImporter:
             valid_df = check_results.get_valid_df(
                 df_selection, self.clm_desired_dtype_dict
             )
+            valid_df_stripped = self.do_strip_columns(valid_df)
             log.info(f"save valid df")
             file_name = self.csv_file_name_without_extension + "_valid.csv"
             full_path = os.path.join(self.csv_file_dir, file_name)
             # save it
-            df_to_csv(valid_df, full_path)
+            df_to_csv(valid_df_stripped, full_path)
 
     def import_whole_table_at_once(self, df_selection):
         """ import whole table at once (convert, strip and save) """

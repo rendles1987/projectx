@@ -101,14 +101,11 @@ class TeamStatsLongTerm:
         pass
 
     def get_json_data(self):
-        my_url = 'https://www.worldfootball.net/report/ligue-1-2006-2007-as-monaco-osc-lille/'
+        my_url = "https://www.worldfootball.net/report/ligue-1-2006-2007-as-monaco-osc-lille/"
 
         new_url = "https://securepubads.g.doubleclick.net/gampad/ads?gdfp_req=1&pvsid=324009158373288&correlator=3197424626384405&output=ldjh&callback=googletag.impl.pubads.callbackProxy1&impl=fif&eid=21062452%2C21063637%2C21063965&vrg=2019081501&guci=1.2.0.0.2.2.0.0&plat=1%3A32776%2C2%3A16809992%2C8%3A134250504&sc=1&sfv=1-0-35&ecs=20190823&iu=%2F53015287%2Fworldfootball.net_d_728x90_1&sz=728x90&cookie_enabled=1&bc=31&abxe=1&lmt=1566557988&dt=1566557988034&dlt=1566557987294&idt=671&frm=20&biw=1838&bih=981&oid=3&adx=-12245933&ady=-12245933&adk=1295409359&uci=1&ifi=1&u_tz=120&u_his=3&u_h=1080&u_w=1920&u_ah=1053&u_aw=1853&u_cd=24&u_nplug=3&u_nmime=4&u_sd=1&flash=0&url=https%3A%2F%2Fwww.worldfootball.net%2Freport%2Fligue-1-2006-2007-as-monaco-osc-lille%2F&dssz=32&icsg=554&std=0&vis=1&dmc=8&scr_x=0&scr_y=0&psz=0x0&msz=0x0&blev=0.96&bisch=1&ga_vid=1688681370.1566552801&ga_sid=1566557988&ga_hid=1798167071&fws=128&ohw=0"
 
         import requests
-
-
-
 
         # shots_url = 'http://stats.nba.com/stats/playerdashptshotlog?' + \
         #             'DateFrom=&DateTo=&GameSegment=&LastNGames=0&LeagueID=00&' + \
@@ -121,20 +118,17 @@ class TeamStatsLongTerm:
         response.raise_for_status()  # raise exception if invalid response
         blaaaat = response.json()
 
-        shots = response.json()['resultSets'][0]['rowSet']
-
-
+        shots = response.json()["resultSets"][0]["rowSet"]
 
         response = requests.get(my_url)
         data = response.json()
 
-
         import urllib.request
         import json
+
         with urllib.request.urlopen(my_url) as url:
             data = json.loads(url.read().decode())
             print(data)
-
 
     def get_nr_games(self, df_games):
         """Calculate nr games (home and away games separated) per team_id, season,
@@ -268,9 +262,9 @@ class TeamStatsLongTerm:
         df_log.drop_duplicates(
             subset=["season", "game_name_id"], keep="first", inplace=True
         )
-        nr_teams = df_log['exp_nr_games'] / 2 + 1
+        nr_teams = df_log["exp_nr_games"] / 2 + 1
         # calc total nr games of whole competition
-        df_log['exp_nr_games'] = (nr_teams * (nr_teams+1)) / 2  # binomial coefficient
+        df_log["exp_nr_games"] = (nr_teams * (nr_teams + 1)) / 2  # binomial coefficient
         # only select rows when missing_games_total > 0
         df_log = df_log[df_log["missing_games_total"] > 0]
         # total_nr_games = (nr_teams * (nr_teams+1)) / 2
@@ -297,9 +291,8 @@ class TeamStatsLongTerm:
         :param nr_teams:
         :return: total_nr_games of whole competition
         """
-        total_nr_games = (nr_teams * (nr_teams+1)) / 2
+        total_nr_games = (nr_teams * (nr_teams + 1)) / 2
         return total_nr_games
-
 
         #
         # df_sum_games["joinn"] = df_sum_games["season"].map(str) + df_sum_games[

@@ -3,7 +3,7 @@ from tools.constants import IMPORT_CSV_DIRS
 from tools.constants import RAW_CSV_DIRS
 from tools.csv_cleaner.csv_cleaner import CupCsvCleaner
 from tools.csv_cleaner.csv_cleaner import LeagueCsvCleaner
-from tools.csv_cleaner.repair_invalid_cleaned import RepairInvalidCleaned
+from tools.csv_cleaner.repair_invalid_cleaned import CupCsvRepair, LeagueCsvRepair
 from tools.csv_dir_info import CleanCsvInfo
 from tools.csv_dir_info import ImportCsvInfo
 from tools.csv_dir_info import RawCsvInfo
@@ -101,8 +101,14 @@ class ProcessController:
         log.info("repairing invalid clean data")
         clean_csv_info = CleanCsvInfo()
         for csv_type, full_path in clean_csv_info.get_all_invalid_csv():
-            repair = RepairInvalidCleaned(csv_type, full_path)
-            repair.run()
+            if csv_type == "cup":
+                repair = CupCsvRepair(csv_type, full_path)
+                repair.run()
+            elif csv_type == "league":
+                repair = LeagueCsvRepair(csv_type, full_path)
+                repair.run()
+            else:
+                raise AssertionError(f"{full_path} it not a cup nor a league csv..")
 
     @staticmethod
     def empty_import_dirs():
