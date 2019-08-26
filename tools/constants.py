@@ -34,6 +34,7 @@ if use_temp:
 
     SQLITE_NAME = "my_sqlite_temp_stuff.db"
     SQLITE_FULL_PATH = MERGE_CSV_DIR + SQLITE_NAME
+
 else:
     RAW_CSV_DIRS = {
         "cup": "/work/data/_01_raw/cup",
@@ -57,7 +58,6 @@ else:
 
     SQLITE_NAME = "my_sqlite.db"
     SQLITE_FULL_PATH = MERGE_CSV_DIR + SQLITE_NAME
-
 
 TAB_DELIMETER = "\t"
 COMMA_DELIMETER = ","

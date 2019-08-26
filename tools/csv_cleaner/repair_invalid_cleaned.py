@@ -1,5 +1,10 @@
 import os
-from tools.utils import is_panda_df_empty, df_to_csv
+from tools.utils import (
+    is_panda_df_empty,
+    df_to_csv,
+    temp_get_unicode,
+    string_to_unicode,
+)
 from tools.constants import TAB_DELIMETER, LEAGUE_GAME_PROPERTIES, CUP_GAME_PROPERTIES
 import pandas as pd
 from tools.scraper.cup_scraper import CupScraper
@@ -66,13 +71,57 @@ class CupCsvRepair(BaseRepairInvalidCleaned):
         self.csv_type = "cup"
         self.properties = CUP_GAME_PROPERTIES
 
+    def managers_the_same(self, new, orig):
+        assert isinstance(new, bytes)
+        assert isinstance(orig, str)
+        return new == temp_get_unicode(orig)
+
+    def sheets_the_same(self, new, orig):
+        assert isinstance(new, list)
+        assert isinstance(orig, str)
+        orig = orig.replace("[", "")
+        orig = orig.replace("]", "")
+        orig_list = orig.split(",")
+        # orig_list_compare = [string_to_unicode(x.strip()) for x in orig_list if x]
+        orig_list_compare = [temp_get_unicode(x.strip()) for x in orig_list if x]
+        return set(new) == set(orig_list_compare)
+
+    def check_managers(self, index, row, df_copy, scraper):
+        updated = False
+        new_home_manager = scraper.home_manager
+        new_away_manager = scraper.away_manager
+        if not self.managers_the_same(new_home_manager, row.home_manager):
+            df_copy.iloc[index]["home_manager"] = new_home_manager
+            updated = True
+        if not self.managers_the_same(new_away_manager, row.away_manager):
+            df_copy.iloc[index]["away_manager"] = new_away_manager
+            updated = True
+        return updated, df_copy
+
+    def check_sheets(self, index, row, df_copy, scraper):
+        updated = False
+        new_home_sheet = scraper.home_sheet
+        new_away_sheet = scraper.away_sheet
+        if not self.sheets_the_same(new_home_sheet, row.home_sheet):
+            df_copy.iloc[index]["home_sheet"] = new_home_sheet
+            updated = True
+        if not self.sheets_the_same(new_away_sheet, row.away_sheet):
+            df_copy.iloc[index]["away_sheet"] = new_away_sheet
+            updated = True
+        return updated, df_copy
+
     def run(self):
+        df_copy = self.dataframe.copy()
+        update_tracker = {"managers": False, "sheets": False}
         for index, row in self.dataframe.iterrows():
             scraper = CupScraper(row.url)
             if "managers" in row["msg"]:
-                new_home_manager = scraper.home_manager
-                new_away_manager = scraper.away_manager
+                update_tracker["managers"], df_copy = self.check_managers(
+                    index, row, df_copy, scraper
+                )
             if "home- and away sheet" in row["msg"]:
-                home_sheet = scraper.home_sheet
-                away_sheet = scraper.away_sheet
-
+                update_tracker["sheets"], df_copy = self.check_sheets(
+                    index, row, df_copy, scraper
+                )
+            # check if new data is okay
+            print("hoi")

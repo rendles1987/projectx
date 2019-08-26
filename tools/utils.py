@@ -131,3 +131,75 @@ def compress_df(df):
         for col in existing_type_columns:
             df[col] = pd.to_numeric(df[col], downcast=search_type)
     return df
+
+
+def string_to_unicode(my_string):
+    try:
+        my_unicode = my_string.encode(encoding="utf-8")
+        return my_unicode
+    except Exception as e1:
+        # is it already a unicode?
+        try:
+            my_unicode = my_string  # my_string is already unicode
+            my_unicode.decode()
+            return my_unicode
+        except Exception as e2:
+            msg = (
+                str(my_string)
+                + ' is instance of "bytes" (unicode), but cannot be decoded??'
+            )
+            raise msg + str(e2)
+    msg = str(my_string) + " cannot be encoded nor decoded..??"
+    raise msg + str(e1)
+
+
+def unicode_to_string(my_unicode):
+    try:
+        my_string = my_unicode.decode(encoding="utf-8")
+        return my_string
+    except Exception as e1:
+        # is it already a string?
+        try:
+            my_string = my_unicode  # my_unicode is already string
+            my_string.encode()
+            return my_string
+        except Exception as e2:
+            msg = str(my_string) + " is instance of str, but cannot be encoded??"
+            raise msg + str(e2)
+    msg = str(my_string) + " cannot be decoded nor encoded..??"
+    raise msg + str(e1)
+
+
+def temp_get_unicode(my_string):
+    """
+    https://stackoverflow.com/questions/39283689/converting-double-slash-utf-8-encoding
+    weird stuff with unicode.
+    Aleksander Puštov is away_manager of first match in this csv:
+    path = '/work/data/temp_stuff/_03_clean/cup/all_games_eur_champions_league_qual_invalid.csv'
+
+    In the csvs (raw, import, clean) it is:     'Aleksander Pu\u0161tov'.
+    However, if you do self.dataframe.iloc[1].away_manager, you get an extra
+    backslash: 'Aleksander Pu\\u0161tov'. Which cannot be encoded:
+    print(orig.encode())  # b'Aleksander Pu\\u0161tov'
+    To fix this, do:
+    1) re-encode the string as UTF-8
+    2) decode it with unicode escape
+    a = 'Aleksander Pu\\u0161tov'
+    b = a.encode("utf-8").decode("unicode_escape")  # 'Aleksander Puštov'
+    c = b.encode(encoding="utf-8")                  # b'Aleksander Pu\xc5\xa1tov'
+
+    # EXAMPLE:
+    a = self.dataframe.iloc[0].away_manager
+    print(a)
+    # 'Aleksander Pu\\u0161tov'
+
+    b = a.encode("utf-8").decode("unicode_escape")
+    print(b)
+    # 'Aleksander Puštov'
+
+    c = b.encode(encoding="utf-8")
+    print(c)
+    # b'Aleksander Pu\xc5\xa1tov'
+    """
+    my_unicode = my_string.encode("utf-8").decode("unicode_escape").encode()
+    return my_unicode

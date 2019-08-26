@@ -24,6 +24,7 @@ from tools.csv_merger.csv_merger import MergeCsvToSqlite
 from tools.sqlite_teams.club_stats import TeamStatsLongTerm, TeamStatsShortTerm
 from tools.sqlite_teams.teams_unique import TeamsUnique
 from tools.sqlite_teams.teams_unique import UpdateGamesWithIds
+from tools.scraper.scrape_all_players import SheetFixer, ManagerSheetScraper
 
 import logging
 import os
@@ -269,6 +270,13 @@ class ProcessController:
                 cup_cleaner = CupCsvCleaner(csv_file_path)
                 cup_cleaner.run()
 
+    def get_all_player_names_per_game_and_store_them(self):
+        log.info("fix all player names")
+        clean_csv_info = CleanCsvInfo()
+        for csv_type, csv_file_path in clean_csv_info.csv_info:
+            sheet_fixer = SheetFixer(csv_type, csv_file_path)
+            sheet_fixer.run()
+
     def enrich(self):
         log.info("enrich clean csv_data")
         clean_csv_info = CleanCsvInfo()
@@ -339,6 +347,10 @@ class ProcessController:
         self.copy_valid_import_to_clean()
         self.clean()
 
+    def do_replace_all_players(self):
+        """Apparently I messed up scraping player names. Not unicode."""
+        self.get_all_player_names_per_game_and_store_them()
+
     def do_repair_invalid_clean(self):
         """repair all invalid csvs in folder 'clean' (as a result of 'do_clean()'"""
         self.check_dirs_exist(self.clean_dirs)  # raise if not exists
@@ -364,7 +376,8 @@ class ProcessController:
         # self.do_scrape()  # scrap data (webpage --> raw)
         # self.do_import()  # import raw data (raw --> import)
         # self.do_clean()  # clean data (import --> clean)
-        self.do_repair_invalid_clean()
+        self.do_replace_all_players()
+        # self.do_repair_invalid_clean()
         # self.do_merge()  # add 2 or 3 columns to clean and then merge to sqlite
         # self.determine_teams()
         # self.do_ml()

@@ -1,14 +1,96 @@
 import pandas as pd
 import time
 import string
-from tools.utils import string_to_unicode, unicode_to_string
+from tools.utils import string_to_unicode, is_panda_df_empty, df_to_sqlite_table
+import os
+from tools.constants import TAB_DELIMETER
+import logging
 
-nr_secondes_sleep = 3
+log = logging.getLogger(__name__)
+
+nr_secondes_sleep = 1
+
+SQLITE_TABLE_NAMES_UNICODE = "unicode_names"
 
 
+class SheetFixer:
+    def __init__(self, csv_type, full_path):
+        self.csv_type = csv_type
+        self.csv_file_full_path = full_path
+        self._dataframe = None
+        self._expected_csv_columns = None
+        self._existing_csv_columns = None
 
-class CupScraper:
+    @property
+    def csv_file_dir(self):
+        assert os.path.isfile(self.csv_file_full_path)
+        assert os.path.isdir(os.path.dirname(self.csv_file_full_path))
+        return os.path.dirname(self.csv_file_full_path)  # '/work/data/raw_data/league/
+
+    @property
+    def csv_file_name_with_extension(self):
+        return self.csv_file_full_path.split("/")[-1]  # 'xx.csv'
+
+    @property
+    def csv_file_name_without_extension(self):
+        return (self.csv_file_full_path.split("/")[-1]).split(".")[0]  # 'xx'
+
+    @property
+    def dataframe(self):
+        if not is_panda_df_empty(self._dataframe):
+            return self._dataframe
+        self._dataframe = pd.read_csv(self.csv_file_full_path, sep=TAB_DELIMETER)
+        return self._dataframe
+
+    def run(self):
+        # pd.DataFrame().reindex_like(df1)
+        columns = [
+            "date",
+            "home",
+            "away",
+            "url",
+            "game_type",
+            "game_name",
+            "country",
+            "source_file",
+            "home_manager",
+            "away_manager",
+            "home_sheet",
+            "away_sheet",
+        ]
+        df = pd.DataFrame().reindex_like(self.dataframe[columns])
+        df['home_manager'] = df['home_manager'].astype(str)
+        df['away_manager'] = df['away_manager'].astype(str)
+        df['home_sheet'] = df['home_sheet'].astype(str)
+        df['away_sheet'] = df['away_sheet'].astype(str)
+
+        # for url = 'http://www.worldfootball.net/report/champions-league-qual-2013-2014-1-runde-eb-streymur-fc-lusitanos-la-posa/'
+        # scraper raise AssertionError(f'{self.url} found more >2 sheets..."')
+
+
+        for index, row in self.dataframe.iterrows():
+            url = row["url"]
+            scraper = ManagerSheetScraper(url)
+            df["date"][index] = row["date"]
+            df["home"][index] = row["home"]
+            df["away"][index] = row["away"]
+            df["url"][index] = row["url"]
+            df["game_type"][index] = row["game_type"]
+            df["game_name"][index] = row["game_name"]
+            df["country"][index] = row["country"]
+            df["source_file"][index] = row["source_file"]
+            df["home_manager"][index] = scraper.home_manager
+            df["away_manager"][index] = scraper.away_manager
+            df["home_sheet"][index] = scraper.home_sheet
+            df["away_sheet"][index] = scraper.away_sheet
+        df_to_sqlite_table(
+            df, table_name=SQLITE_TABLE_NAMES_UNICODE, if_exists="append"
+        )
+
+
+class ManagerSheetScraper:
     def __init__(self, url):
+        log.info(f'start scraping for url: {url}')
         self.url = url
         self._tables = None
         self._home_manager = None
@@ -53,7 +135,7 @@ class CupScraper:
             if "Manager:" in col:
                 return True
 
-    def get_managers_tbl_id(self):
+    def __get_managers_tbl_id(self):
         """
         Find out which table contains managers.
         tbl with manager info is empty (managers are in column names!!)
@@ -73,7 +155,7 @@ class CupScraper:
         return manager_table_id
 
     def __get_managers(self):
-        manager_table_id = self.get_managers_tbl_id()
+        manager_table_id = self.__get_managers_tbl_id()
         manager_tbl = self.tables[manager_table_id]
         manager_home = None
         manager_away = None
@@ -90,7 +172,7 @@ class CupScraper:
         self._home_manager = manager_home
         self._away_manager = manager_away
 
-    def get_sheet_tbl_ids(self):
+    def __get_sheet_tbl_ids(self):
         nan_list = ["NaN", "nan", "Nan", "NAN"]
         found_home = False
         found_away = False
@@ -166,7 +248,7 @@ class CupScraper:
         - sheets table column has dtype 'int64')
         - lets try to find a table with a lot of sting characters (sometimes with some ints)
         """
-        sheet_tbl_ids = self.get_sheet_tbl_ids()
+        sheet_tbl_ids = self.__get_sheet_tbl_ids()
         home_list_with_subs = self.tables[sheet_tbl_ids["home_tbl"]][
             sheet_tbl_ids["home_col"]
         ].to_list()
