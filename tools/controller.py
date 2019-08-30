@@ -1,6 +1,9 @@
-from tools.constants import CLEAN_CSV_DIRS
-from tools.constants import IMPORT_CSV_DIRS
-from tools.constants import RAW_CSV_DIRS
+from tools.constants import (
+    CLEAN_CSV_DIRS,
+    IMPORT_CSV_DIRS,
+    RAW_CSV_DIRS,
+    SQLITE_TABLE_NAMES_UNICODE,
+)
 from tools.csv_cleaner.csv_cleaner import CupCsvCleaner
 from tools.csv_cleaner.csv_cleaner import LeagueCsvCleaner
 from tools.csv_cleaner.repair_invalid_cleaned import CupCsvRepair, LeagueCsvRepair
@@ -24,12 +27,14 @@ from tools.csv_merger.csv_merger import MergeCsvToSqlite
 from tools.sqlite_teams.club_stats import TeamStatsLongTerm, TeamStatsShortTerm
 from tools.sqlite_teams.teams_unique import TeamsUnique
 from tools.sqlite_teams.teams_unique import UpdateGamesWithIds
-from tools.scraper.scrape_all_players import SheetFixer, ManagerSheetScraper
+from tools.scraper.scrape_all_players import SheetFixer
+from tools.utils import df_to_sqlite_table, sqlite_table_to_df
+
 
 import logging
 import os
 import shutil
-
+import time
 
 log = logging.getLogger(__name__)
 
@@ -273,9 +278,38 @@ class ProcessController:
     def get_all_player_names_per_game_and_store_them(self):
         log.info("fix all player names")
         clean_csv_info = CleanCsvInfo()
+
+        df = sqlite_table_to_df(table_name=SQLITE_TABLE_NAMES_UNICODE)
+        log.info(f'nr rows before dropping duplicates: {str(len(df))}')
+        time.sleep(1)
+        df.drop_duplicates(keep='first', inplace=True)
+        log.info(f'nr rows after dropping duplicates: {str(len(df))}')
+        time.sleep(1)
+        df_to_sqlite_table(
+            df, table_name=SQLITE_TABLE_NAMES_UNICODE, if_exists="replace"
+        )
+
+        import pandas as pd
+        nr_games = 0
+        for csv_type, csv_file_path in clean_csv_info.csv_info:
+            df = pd.read_csv(csv_file_path, sep="\t")
+            nr_games += len(df)
+        log.info(f'found in total {str(nr_games)} games ')
+        time.sleep(1)
+
+        for csv_type, csv_file_path in clean_csv_info.csv_info:
+            # first fix only the valid csvs
+            invalid_paths = []
+            if not 'invalid' in csv_file_path:
+                invalid_paths.append((csv_type, csv_file_path))
+                sheet_fixer = SheetFixer(csv_type, csv_file_path)
+                sheet_fixer.run()
+
+        # secondly, fix only the invalid csvs
         for csv_type, csv_file_path in clean_csv_info.csv_info:
             sheet_fixer = SheetFixer(csv_type, csv_file_path)
             sheet_fixer.run()
+
 
     def enrich(self):
         log.info("enrich clean csv_data")

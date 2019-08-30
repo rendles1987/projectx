@@ -2,12 +2,13 @@
 # -*- coding: utf-8 -*-
 
 from bs4 import BeautifulSoup
-import requests
+from datetime import datetime
+
+import os.path
 import pandas as pd
 import re
+import requests
 import time
-import os.path
-from datetime import datetime
 
 
 def namestr(obj, namespace):

@@ -1,14 +1,15 @@
-from tools.constants import (
-    TABLE_NAME_ALL_GAMES_WITH_IDS,
-    TABLE_NAME_LONG_TERM_STATS,
-    GAMENAME_ID_LEAGUE,
-    ALL_GAMEID_NAME_MAPPING,
-    ALL_GAMEID_COUNTRY_MAPPING,
-)
-import math
-from tools.utils import sqlite_table_to_df, compress_df, df_to_sqlite_table
+from tools.constants import ALL_GAMEID_COUNTRY_MAPPING
+from tools.constants import ALL_GAMEID_NAME_MAPPING
+from tools.constants import GAMENAME_ID_LEAGUE
+from tools.constants import TABLE_NAME_ALL_GAMES_WITH_IDS
+from tools.constants import TABLE_NAME_LONG_TERM_STATS
+from tools.utils import compress_df
+from tools.utils import df_to_sqlite_table
+from tools.utils import sqlite_table_to_df
 
 import logging
+import math
+
 
 log = logging.getLogger(__name__)
 
@@ -282,7 +283,6 @@ class TeamStatsLongTerm:
             sep=",",
             mode="w",
         )
-        print("hoi")
         # 2) Then we get de specific id of teams that played to few games
 
     def test(self, nr_teams):
@@ -342,8 +342,6 @@ class TeamStatsLongTerm:
         # majority (16 teams) played 38 games.
 
         # f_first_last_gamedates.reset_index(level=columns, inplace=True, drop=False)
-
-        print("hoi")
 
         # (df_obj_count_bracket > 1).sum(axis=1)
 

@@ -9,6 +9,10 @@ TABLE_NAME_ALL_TEAMS = "team_id_name_country"
 TABLE_NAME_ALL_GAMES = "all_games"
 TABLE_NAME_ALL_GAMES_WITH_IDS = "all_games_ids"
 TABLE_NAME_LONG_TERM_STATS = "team_long_term_stats"
+SQLITE_TABLE_NAMES_UNICODE = (
+    "unicode_names"
+)  # contains for all games the standard details + start_time, and names of managers, starters and subs (unicode)  noqa
+
 
 use_temp = True
 if use_temp:
@@ -32,7 +36,7 @@ if use_temp:
 
     MERGE_CSV_DIR = "/work/data/temp_stuff/_04_merge/"
 
-    SQLITE_NAME = "my_sqlite_temp_stuff.db"
+    SQLITE_NAME = "temp_my_sqlite.db"
     SQLITE_FULL_PATH = MERGE_CSV_DIR + SQLITE_NAME
 
 else:

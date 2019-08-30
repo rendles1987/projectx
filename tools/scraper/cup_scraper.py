@@ -6,7 +6,6 @@ from tools.utils import string_to_unicode, unicode_to_string
 nr_secondes_sleep = 3
 
 
-
 class CupScraper:
     def __init__(self, url):
         self.url = url

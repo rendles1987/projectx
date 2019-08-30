@@ -2,13 +2,14 @@
 # -*- coding: utf-8 -*-
 
 from bs4 import BeautifulSoup
-import requests
+from pandas.compat import u
+
+import numpy as np
+import os.path
 import pandas as pd
 import re
+import requests
 import time
-import os.path
-import numpy as np
-from pandas.compat import u
 
 
 """

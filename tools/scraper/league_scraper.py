@@ -3,4 +3,4 @@ class LeagueScraper:
         self.url = url
 
     def scrape(self):
-        print("hoi")
+        pass

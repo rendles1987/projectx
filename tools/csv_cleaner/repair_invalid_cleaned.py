@@ -1,14 +1,15 @@
-import os
-from tools.utils import (
-    is_panda_df_empty,
-    df_to_csv,
-    temp_get_unicode,
-    string_to_unicode,
-)
-from tools.constants import TAB_DELIMETER, LEAGUE_GAME_PROPERTIES, CUP_GAME_PROPERTIES
-import pandas as pd
+from tools.constants import CUP_GAME_PROPERTIES
+from tools.constants import LEAGUE_GAME_PROPERTIES
+from tools.constants import TAB_DELIMETER
 from tools.scraper.cup_scraper import CupScraper
 from tools.scraper.league_scraper import LeagueScraper
+from tools.utils import df_to_csv
+from tools.utils import is_panda_df_empty
+from tools.utils import string_to_unicode
+from tools.utils import temp_get_unicode
+
+import os
+import pandas as pd
 
 
 class BaseRepairInvalidCleaned:
@@ -124,4 +125,3 @@ class CupCsvRepair(BaseRepairInvalidCleaned):
                     index, row, df_copy, scraper
                 )
             # check if new data is okay
-            print("hoi")

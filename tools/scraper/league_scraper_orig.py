@@ -40,12 +40,13 @@ note:
 """
 
 from bs4 import BeautifulSoup
-import requests
+from pandas.compat import u
+
+import os.path
 import pandas as pd
 import re
+import requests
 import time
-import os.path
-from pandas.compat import u
 
 
 season_list = [

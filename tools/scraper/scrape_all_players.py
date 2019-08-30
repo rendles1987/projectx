@@ -3,14 +3,15 @@ import time
 import string
 from tools.utils import string_to_unicode, is_panda_df_empty, df_to_sqlite_table
 import os
-from tools.constants import TAB_DELIMETER
+from tools.constants import TAB_DELIMETER, SQLITE_TABLE_NAMES_UNICODE
 import logging
+import numpy as np
+from tools.utils import df_to_sqlite_table, sqlite_table_to_df
+
 
 log = logging.getLogger(__name__)
 
-nr_secondes_sleep = 1
-
-SQLITE_TABLE_NAMES_UNICODE = "unicode_names"
+nr_secondes_sleep = 2
 
 
 class SheetFixer:
@@ -20,6 +21,7 @@ class SheetFixer:
         self._dataframe = None
         self._expected_csv_columns = None
         self._existing_csv_columns = None
+        self._df_existing_sqlite_rows = None
 
     @property
     def csv_file_dir(self):
@@ -42,8 +44,26 @@ class SheetFixer:
         self._dataframe = pd.read_csv(self.csv_file_full_path, sep=TAB_DELIMETER)
         return self._dataframe
 
-    def run(self):
-        # pd.DataFrame().reindex_like(df1)
+    @property
+    def df_existing_sqlite_rows(self):
+        if not is_panda_df_empty(self._df_existing_sqlite_rows):
+            return self._df_existing_sqlite_rows
+        self._df_existing_sqlite_rows = sqlite_table_to_df(
+            table_name=SQLITE_TABLE_NAMES_UNICODE
+        )
+        return self._df_existing_sqlite_rows
+        # if is_panda_df_empty(self._df_existing_sqlite_rows):
+        #     return None
+        # return self._df_existing_sqlite_rows
+
+    def row_already_in_sqlite(self, row):
+        """Check if row [home, away, date] already exists in the sqlite """
+        df = self.df_existing_sqlite_rows
+        return (
+            (df.home == row.home) & (df.away == row.away) & (df.date == row.date)
+        ).any()
+
+    def create_empty_df(self):
         columns = [
             "date",
             "home",
@@ -59,50 +79,112 @@ class SheetFixer:
             "away_sheet",
         ]
         df = pd.DataFrame().reindex_like(self.dataframe[columns])
-        df['home_manager'] = df['home_manager'].astype(str)
-        df['away_manager'] = df['away_manager'].astype(str)
-        df['home_sheet'] = df['home_sheet'].astype(str)
-        df['away_sheet'] = df['away_sheet'].astype(str)
+        # set these column to dtype str and empty them
+        columns = [
+            "home_manager",
+            "away_manager",
+            "home_sheet",
+            "away_sheet",
+            "start_time",
+            "home_subs",
+            "away_subs",
+        ]
+        for col in columns:
+            df[col] = df["home_manager"].astype(str)
+            df[col] = np.NaN
+        return df
 
-        # for url = 'http://www.worldfootball.net/report/champions-league-qual-2013-2014-1-runde-eb-streymur-fc-lusitanos-la-posa/'
-        # scraper raise AssertionError(f'{self.url} found more >2 sheets..."')
+    def run(self):
+
+        try:
+            for index, row in self.dataframe.iterrows():
+                if self.row_already_in_sqlite(row):
+                    # log.info(f"this row is already in sqlite {row.url}")
+                    continue
+                df = self.create_empty_df()
+                df["date"][index] = row["date"]
+                df["home"][index] = row["home"]
+                df["away"][index] = row["away"]
+                df["url"][index] = row["url"]
+                df["game_type"][index] = row["game_type"]
+                df["game_name"][index] = row["game_name"]
+                df["country"][index] = row["country"]
+                df["source_file"][index] = row["source_file"]
+                if str(row["url"]) == "nan":
+                    df["home_manager"][index] = np.nan
+                    df["away_manager"][index] = np.nan
+                    df["home_sheet"][index] = np.nan
+                    df["away_sheet"][index] = np.nan
+                    df["home_subs"][index] = np.nan
+                    df["away_subs"][index] = np.nan
+                    df["start_time"][index] = np.nan
+                else:
+                    scraper = UnicodeScraper(row["url"])
+                    if not scraper.can_read_html():
+                        continue
+                    df["home_manager"][index] = scraper.home_manager
+                    df["away_manager"][index] = scraper.away_manager
+                    df["home_sheet"][index] = scraper.home_sheet
+                    df["away_sheet"][index] = scraper.away_sheet
+                    df["home_subs"][index] = scraper.home_subs
+                    df["away_subs"][index] = scraper.away_subs
+                    df["start_time"][index] = scraper.start_time
+
+                # Drop rows if all empty cells
+                df.dropna(axis=0, how="all", thresh=None, subset=None, inplace=True)
+
+                # add row by row instead of whole csv
+                if len(df) > 0:
+                    df_to_sqlite_table(
+                        df, table_name=SQLITE_TABLE_NAMES_UNICODE, if_exists="append"
+                    )
+        except JumpToNextCsvRow:
+            log.error(f'skipped row {index} of {self.csv_file_full_path}')
 
 
-        for index, row in self.dataframe.iterrows():
-            url = row["url"]
-            scraper = ManagerSheetScraper(url)
-            df["date"][index] = row["date"]
-            df["home"][index] = row["home"]
-            df["away"][index] = row["away"]
-            df["url"][index] = row["url"]
-            df["game_type"][index] = row["game_type"]
-            df["game_name"][index] = row["game_name"]
-            df["country"][index] = row["country"]
-            df["source_file"][index] = row["source_file"]
-            df["home_manager"][index] = scraper.home_manager
-            df["away_manager"][index] = scraper.away_manager
-            df["home_sheet"][index] = scraper.home_sheet
-            df["away_sheet"][index] = scraper.away_sheet
-        df_to_sqlite_table(
-            df, table_name=SQLITE_TABLE_NAMES_UNICODE, if_exists="append"
-        )
+class JumpToNextCsvRow(Exception):
+    pass
 
 
-class ManagerSheetScraper:
+class UnicodeScraper:
     def __init__(self, url):
-        log.info(f'start scraping for url: {url}')
+        log.info(f"start scraping for url: {url}")
         self.url = url
         self._tables = None
         self._home_manager = None
         self._away_manager = None
         self._home_sheet = None
+        self._home_subs = None
         self._away_sheet = None
+        self._away_subs = None
+        self._start_time = None
+
+    def can_read_html(self):
+        try:
+            self._tables = pd.read_html(self.url)
+            return True
+        except Exception as e:
+            return False
 
     @property
     def tables(self):
         if not self._tables:
-            self._tables = pd.read_html(self.url)
-            time.sleep(nr_secondes_sleep)
+            try:
+                self._tables = pd.read_html(self.url)
+                time.sleep(nr_secondes_sleep)
+                try:
+                    # wtf... sometimes it works a second time (same url)
+                    time.sleep(nr_secondes_sleep)
+                    self._tables = pd.read_html(self.url)
+                    time.sleep(nr_secondes_sleep)
+                except Exception as e:
+                    log.error(f"could not read_html for 2nd time: {self.url}")
+                    log.error(str(e))
+                    raise JumpToNextCsvRow
+            except Exception as e:
+                log.error(f"could not read_html for 1st time: {self.url}")
+                log.error(str(e))
+                raise JumpToNextCsvRow
         return self._tables
 
     @property
@@ -129,6 +211,40 @@ class ManagerSheetScraper:
             self.__get_sheets()
         return self._away_sheet
 
+    @property
+    def home_subs(self):
+        if not self._home_subs:
+            self.__get_sheets()
+        return self._home_subs
+
+    @property
+    def away_subs(self):
+        if not self._away_subs:
+            self.__get_sheets()
+        return self._away_subs
+
+    @property
+    def start_time(self):
+        if not self._start_time:
+            self.__get_start_time()
+        return self._start_time
+
+    def __get_start_time(self):
+        tbl_with_object_columns = [
+            tbl_id
+            for tbl_id, tbl in enumerate(self.tables)
+            if tbl.columns.dtype == "object"
+        ]
+        time_found = False
+        for tbl_id in tbl_with_object_columns:
+            table = self.tables[tbl_id]
+            for col in table.columns:
+                if "clock" in col.lower():
+                    time_found = True
+                    self._start_time = col
+        if not time_found:
+            self._start_time = "unknown"
+
     @staticmethod
     def __managers_in_tbl(tbl):
         for col in tbl.columns:
@@ -144,6 +260,7 @@ class ManagerSheetScraper:
             # Index: []
         :return: table id (int
                 """
+
         # we expect only 1 number_of_manager_tbls
         number_of_manager_tbls = 0
         for tbl_id, tbl in enumerate(self.tables):
@@ -151,26 +268,33 @@ class ManagerSheetScraper:
                 if self.__managers_in_tbl(tbl):
                     number_of_manager_tbls += 1
                     manager_table_id = tbl_id
-        assert number_of_manager_tbls == 1
+        if number_of_manager_tbls != 1:
+            log.error(f'{self.url} number_of_manager_tbls is not 1')
+            raise JumpToNextCsvRow
         return manager_table_id
 
     def __get_managers(self):
         manager_table_id = self.__get_managers_tbl_id()
         manager_tbl = self.tables[manager_table_id]
-        manager_home = None
-        manager_away = None
+        # we put managers in list and return the str(list) so that we keep the
+        # string bytes e.g. '[abr/ux2movic]' instead of 'abromovic'
+        manager_home = []
+        manager_away = []
         for clm in manager_tbl:
             if "Manager:" in clm:
                 if manager_home and manager_away:
-                    raise AssertionError(f'{self.url} found more >2 "Managers:"')
+                    log.error(f'{self.url} found more >2 "Managers:"')
+                    raise JumpToNextCsvRow
                 full_name = clm.rsplit(sep=":")[1].strip()
-                assert full_name
+                if not full_name:
+                    log.error(f'{self.url} full_name not found')
+                    raise JumpToNextCsvRow
                 if not manager_home:
-                    manager_home = string_to_unicode(full_name)
+                    manager_home.append(string_to_unicode(full_name))
                 elif not manager_away:
-                    manager_away = string_to_unicode(full_name)
-        self._home_manager = manager_home
-        self._away_manager = manager_away
+                    manager_away.append(string_to_unicode(full_name))
+        self._home_manager = str(manager_home)
+        self._away_manager = str(manager_away)
 
     def __get_sheet_tbl_ids(self):
         nan_list = ["NaN", "nan", "Nan", "NAN"]
@@ -200,14 +324,18 @@ class ManagerSheetScraper:
                     )
                     if nr_chars > 80:
                         it_is_penalties = [
-                            value
-                            for value in values
-                            if "Penalty" in str(value) or "penalty" in str(value)
+                            value for value in values if "penalty" in str(value).lower()
                         ]
                         if it_is_penalties:
                             continue
+                        it_is_goals_overview = [
+                            value for value in values if "goals" in str(value).lower()
+                        ]
+                        if it_is_goals_overview:
+                            continue
                         if found_home and found_away:
-                            raise AssertionError(f'{self.url} found more >2 sheets..."')
+                            log.error(f'{self.url} found more >2 sheets..."')
+                            raise JumpToNextCsvRow
                         if not found_home:
                             found_home = True
                             sheet_locations["home_tbl"] = tbl_id
@@ -218,7 +346,7 @@ class ManagerSheetScraper:
                             sheet_locations["away_col"] = col_id
         return sheet_locations
 
-    def __get_clean_sheet(self, list_with_subs):
+    def __get_improved_sheet(self, list_with_subs):
         """1. Clean list from digits at end of players name, e.g ""Agius  13'". He
         scored in 13th minute..
         2. Only select starter, so loop up till 'Substitutes'
@@ -227,20 +355,30 @@ class ManagerSheetScraper:
         ['Andrew Hogg', 'Rui', "Andrei Agius  13'", 'Jackson', 'Rodolfo Soares', 'Bjorn Kristensen', 'Johan Bezzina', 'Marco Sahanek', 'Marcelo Dias', "Clayton Failla  7'", 'Jorghino', 'Substitutes',
         :return: list with strings
         """
-        clean_list = []
+        starters = []
+        subs = []
+        this_is_starter = True
         for player in list_with_subs:
             stripped_player = player.strip()
             if stripped_player.lower() in ["substitutes", "substitute"]:
-                break
+                this_is_starter = False
+                continue
+            # remove possible numbers at the end of string (with a space before!
+            # <- unicode) e.g. "Andrei Agius  13'", "Clayton Failla  7'"
             if stripped_player[-1] == "'" and stripped_player[-2] in string.digits:
-                # remove numbers at the end of string (with a space before! <- unicode)
-                # "Andrei Agius  13'", "Clayton Failla  7'"
                 player_minus_last_char = stripped_player[:-1]  # last char is "'"
                 cleaned_player = player_minus_last_char.rstrip(string.digits)
                 stripped_player = cleaned_player.strip()
+            assert string.digits not in stripped_player, "numbers still in player name"
             stripped_player_u = string_to_unicode(stripped_player)
-            clean_list.append(stripped_player_u)
-        return clean_list
+            if this_is_starter:
+                starters.append(stripped_player_u)
+            else:
+                subs.append(stripped_player_u)
+        # we cannot add list to a cell in sqlite... So make it a string...
+        starters = str(starters)
+        subs = str(subs)
+        return starters, subs
 
     def __get_sheets(self):
         """ we expect:
@@ -249,11 +387,26 @@ class ManagerSheetScraper:
         - lets try to find a table with a lot of sting characters (sometimes with some ints)
         """
         sheet_tbl_ids = self.__get_sheet_tbl_ids()
-        home_list_with_subs = self.tables[sheet_tbl_ids["home_tbl"]][
-            sheet_tbl_ids["home_col"]
-        ].to_list()
+
+        if not sheet_tbl_ids.get("home_tbl") or sheet_tbl_ids.get("home_col"):
+            self._home_sheet, self._home_subs = np.nan, np.nan
+            self._away_sheet, self._away_subs = np.nan, np.nan
+            return
+
+        try:
+            home_list_with_subs = self.tables[sheet_tbl_ids["home_tbl"]][
+                sheet_tbl_ids["home_col"]
+            ].to_list()
+        except Exception as e:
+            # e = list indices must be integers or slices, not NoneType
+            # url: http://www.worldfootball.net/report/taca-2016-2017-3-runde-fc-penafiel-amarante-fc/
+            print("hoi")
         away_list_with_subs = self.tables[sheet_tbl_ids["away_tbl"]][
             sheet_tbl_ids["away_col"]
         ].to_list()
-        self._home_sheet = self.__get_clean_sheet(home_list_with_subs)
-        self._away_sheet = self.__get_clean_sheet(away_list_with_subs)
+        self._home_sheet, self._home_subs = self.__get_improved_sheet(
+            home_list_with_subs
+        )
+        self._away_sheet, self._away_subs = self.__get_improved_sheet(
+            away_list_with_subs
+        )
