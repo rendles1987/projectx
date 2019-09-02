@@ -11,10 +11,10 @@ from tools.utils import df_to_sqlite_table, sqlite_table_to_df
 
 log = logging.getLogger(__name__)
 
-nr_secondes_sleep = 2
+nr_secondes_sleep = 1
 
 
-class SheetFixer:
+class UnicodeScraperController:
     def __init__(self, csv_type, full_path):
         self.csv_type = csv_type
         self.csv_file_full_path = full_path
@@ -138,11 +138,11 @@ class SheetFixer:
                     df_to_sqlite_table(
                         df, table_name=SQLITE_TABLE_NAMES_UNICODE, if_exists="append"
                     )
-        except JumpToNextCsvRow:
-            log.error(f'skipped row {index} of {self.csv_file_full_path}')
+        except JumpToNextRow:
+            log.error(f"skipped row {index} of {self.csv_file_full_path}")
 
 
-class JumpToNextCsvRow(Exception):
+class JumpToNextRow(Exception):
     pass
 
 
@@ -162,6 +162,7 @@ class UnicodeScraper:
     def can_read_html(self):
         try:
             self._tables = pd.read_html(self.url)
+            time.sleep(nr_secondes_sleep)
             return True
         except Exception as e:
             return False
@@ -180,11 +181,11 @@ class UnicodeScraper:
                 except Exception as e:
                     log.error(f"could not read_html for 2nd time: {self.url}")
                     log.error(str(e))
-                    raise JumpToNextCsvRow
+                    raise JumpToNextRow
             except Exception as e:
                 log.error(f"could not read_html for 1st time: {self.url}")
                 log.error(str(e))
-                raise JumpToNextCsvRow
+                raise JumpToNextRow
         return self._tables
 
     @property
@@ -269,8 +270,8 @@ class UnicodeScraper:
                     number_of_manager_tbls += 1
                     manager_table_id = tbl_id
         if number_of_manager_tbls != 1:
-            log.error(f'{self.url} number_of_manager_tbls is not 1')
-            raise JumpToNextCsvRow
+            log.error(f"{self.url} number_of_manager_tbls is not 1")
+            raise JumpToNextRow
         return manager_table_id
 
     def __get_managers(self):
@@ -284,11 +285,11 @@ class UnicodeScraper:
             if "Manager:" in clm:
                 if manager_home and manager_away:
                     log.error(f'{self.url} found more >2 "Managers:"')
-                    raise JumpToNextCsvRow
+                    raise JumpToNextRow
                 full_name = clm.rsplit(sep=":")[1].strip()
                 if not full_name:
-                    log.error(f'{self.url} full_name not found')
-                    raise JumpToNextCsvRow
+                    log.error(f"{self.url} full_name not found")
+                    raise JumpToNextRow
                 if not manager_home:
                     manager_home.append(string_to_unicode(full_name))
                 elif not manager_away:
@@ -335,7 +336,7 @@ class UnicodeScraper:
                             continue
                         if found_home and found_away:
                             log.error(f'{self.url} found more >2 sheets..."')
-                            raise JumpToNextCsvRow
+                            raise JumpToNextRow
                         if not found_home:
                             found_home = True
                             sheet_locations["home_tbl"] = tbl_id
@@ -359,6 +360,10 @@ class UnicodeScraper:
         subs = []
         this_is_starter = True
         for player in list_with_subs:
+            # https://www.worldfootball.net/report/segunda-division-2017-2018-fc-barcelona-b-gimnastic/
+            # in between Perez en Varo str(player) is 'nan' ...
+            if str(player) == 'nan':
+                continue
             stripped_player = player.strip()
             if stripped_player.lower() in ["substitutes", "substitute"]:
                 this_is_starter = False
@@ -388,7 +393,7 @@ class UnicodeScraper:
         """
         sheet_tbl_ids = self.__get_sheet_tbl_ids()
 
-        if not sheet_tbl_ids.get("home_tbl") or sheet_tbl_ids.get("home_col"):
+        if not sheet_tbl_ids.get("home_tbl") or not sheet_tbl_ids.get("home_col"):
             self._home_sheet, self._home_subs = np.nan, np.nan
             self._away_sheet, self._away_subs = np.nan, np.nan
             return
@@ -398,15 +403,23 @@ class UnicodeScraper:
                 sheet_tbl_ids["home_col"]
             ].to_list()
         except Exception as e:
-            # e = list indices must be integers or slices, not NoneType
-            # url: http://www.worldfootball.net/report/taca-2016-2017-3-runde-fc-penafiel-amarante-fc/
-            print("hoi")
-        away_list_with_subs = self.tables[sheet_tbl_ids["away_tbl"]][
-            sheet_tbl_ids["away_col"]
-        ].to_list()
-        self._home_sheet, self._home_subs = self.__get_improved_sheet(
-            home_list_with_subs
-        )
-        self._away_sheet, self._away_subs = self.__get_improved_sheet(
-            away_list_with_subs
-        )
+            home_list_with_subs = []
+        try:
+            away_list_with_subs = self.tables[sheet_tbl_ids["away_tbl"]][
+                sheet_tbl_ids["away_col"]
+            ].to_list()
+        except Exception as e:
+            away_list_with_subs = []
+
+        if home_list_with_subs:
+            self._home_sheet, self._home_subs = self.__get_improved_sheet(
+                home_list_with_subs
+            )
+        else:
+            self._home_sheet, self._home_subs = np.nan, np.nan
+        if away_list_with_subs:
+            self._away_sheet, self._away_subs = self.__get_improved_sheet(
+                away_list_with_subs
+            )
+        else:
+            self._away_sheet, self._away_subs = np.nan, np.nan

@@ -1,7 +1,4 @@
-import pandas
-
 from tools.constants import SQLITE_FULL_PATH
-
 import logging
 import os
 import pandas as pd
@@ -105,7 +102,7 @@ def df_to_sqlite_table(df, table_name=None, if_exists=None):
     assert os.path.isfile(SQLITE_FULL_PATH)
     assert table_name
     assert if_exists in ["fail", "replace", "append"]
-    # log.info(f"panda df to sqlite table {table_name}")
+    log.info(f"panda df to sqlite table {table_name}")
     connex = sqlite3.connect(SQLITE_FULL_PATH)
     df.to_sql(name=table_name, con=connex, if_exists=if_exists, index=False)
     connex.close()

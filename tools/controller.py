@@ -27,9 +27,11 @@ from tools.csv_merger.csv_merger import MergeCsvToSqlite
 from tools.sqlite_teams.club_stats import TeamStatsLongTerm, TeamStatsShortTerm
 from tools.sqlite_teams.teams_unique import TeamsUnique
 from tools.sqlite_teams.teams_unique import UpdateGamesWithIds
-from tools.scraper.scrape_all_players import SheetFixer
-from tools.utils import df_to_sqlite_table, sqlite_table_to_df
-
+from tools.utils import df_to_sqlite_table, sqlite_table_to_df, is_panda_df_empty
+import numpy as np
+from tools.scraper.scrape_all_players import UnicodeScraper
+from tools.csv_cleaner.repair_invalid_cleaned import UpdateNamesGameCsv
+from tools.scraper.scrape_all_players import JumpToNextRow
 
 import logging
 import os
@@ -38,6 +40,20 @@ import time
 
 log = logging.getLogger(__name__)
 
+from sys import getsizeof
+import inspect
+
+
+def retrieve_name(var):
+    callers_local_vars = inspect.currentframe().f_back.f_locals.items()
+    return [var_name for var_name, var_val in callers_local_vars if var_val is var]
+
+
+def log_size_of_variable(my_var, my_var_string):
+    my_var_name = my_var_string  # retrieve_name(my_var)
+    my_var_size_b = getsizeof(my_var)
+    my_var_size_mb = getsizeof(my_var) / (1000*1000)
+    log.info(f'variable {my_var_name}: {my_var_size_mb} mbytes')
 
 class ProcessController:
     def __init__(self):
@@ -117,6 +133,16 @@ class ProcessController:
                 raise AssertionError(f"{full_path} it not a cup nor a league csv..")
 
     @staticmethod
+    def replace_managers_sheets_in_clean_dir_csvs():
+        log.info("replacing managers and sheets in just copied csvs to clean dir")
+        clean_csv_info = CleanCsvInfo()
+
+        # first all valid csvs
+        for csv_type, full_path in clean_csv_info.get_all_csv():
+            update_names = UpdateNamesGameCsv(csv_type, full_path)
+            update_names.run()
+
+    @staticmethod
     def empty_import_dirs():
         log.info("empty import dirs")
         import_csv_info = ImportCsvInfo()
@@ -146,9 +172,6 @@ class ProcessController:
             ]
             for csv in csv_paths:
                 shutil.copy(csv, dest_dir)
-
-    def copy_rename_one_file(self):
-        pass
 
     def copy_valid_import_to_clean(self):
         """ copy all "*_valid.csv" files from import to clean dirs"""
@@ -230,6 +253,7 @@ class ProcessController:
             #         raise AssertionError("I only expected nan error in cup csvs..")
 
     def fix_player_sheets(self):
+        """ change to np.nan if '[]'"""
         log.info("fix players sheets")
         import_csv_info = ImportCsvInfo()
         for csv_type, csv_file_path in import_csv_info.csv_info:
@@ -238,6 +262,7 @@ class ProcessController:
                 df_to_csv(df, csv_file_path)  # replace if exists
 
     def fix_managers(self):
+        """ change to np.nan if '[]'"""
         log.info("fix managers")
         import_csv_info = ImportCsvInfo()
         for csv_type, csv_file_path in import_csv_info.csv_info:
@@ -275,41 +300,105 @@ class ProcessController:
                 cup_cleaner = CupCsvCleaner(csv_file_path)
                 cup_cleaner.run()
 
+    def __iter_trough_nans(self, df, df_nan):
+        # log_size_of_variable(df, 'df')
+        # log_size_of_variable(df_nan, 'df_nan')
+        scrape_count = 0
+        # row_ids = []
+        for index, row in df_nan.iterrows():
+            scrape_count += 1
+            scraper = UnicodeScraper(row["url"])
+            if not scraper.can_read_html():
+                continue
+            try:
+                if scraper.home_sheet is not np.nan:
+                    df["home_sheet"][index] = scraper.home_sheet
+                    df["away_sheet"][index] = scraper.away_sheet
+                    df["home_subs"][index] = scraper.home_subs
+                    df["away_subs"][index] = scraper.away_subs
+                df["checked_nan_sheets"][index] = 1
+                # row_ids.append(index)
+            except JumpToNextRow:
+                continue
+            # sum_nans = sum(df["checked_nan_sheets"])
+            # log.info(f"sum check_nan_sheets: {str(sum_nans)}")
+            if scrape_count == 300:
+                # df["checked_nan_sheets"][row_ids] = 1
+                self.rows_to_sqlite_and_start_next_phase(df)
+
+    def rows_to_sqlite_and_start_next_phase(self, df):
+        df_to_sqlite_table(
+            df, table_name=SQLITE_TABLE_NAMES_UNICODE, if_exists="replace"
+        )
+        df, df_nan = self.not_first_phase_df()
+        if not is_panda_df_empty(df_nan):
+            self.__iter_trough_nans(df, df_nan)
+        else:
+            log.info(f"no more nan rows")
+
+    def first_phase_df(self):
+        """Column "checked_nan_sheets" is set to False"""
+        df = sqlite_table_to_df(table_name=SQLITE_TABLE_NAMES_UNICODE)
+        # df["checked_nan_sheets"] = 0
+
+        df_nan = df[
+            (df["home_sheet"].isna())
+            & (df["away_sheet"].isna())
+            & (~df["url"].isna() & (df["checked_nan_sheets"] == 0))
+        ]
+        log.info(f"number of rows with nan sheets to be checked: {len(df_nan)}")
+        return df, df_nan
+
+    def not_first_phase_df(self):
+        """Column "checked_nan_sheets" is not updated"""
+        df = sqlite_table_to_df(table_name=SQLITE_TABLE_NAMES_UNICODE)
+        df_nan = df[
+            (df["home_sheet"].isna())
+            & (df["away_sheet"].isna())
+            & (~df["url"].isna() & (df["checked_nan_sheets"] == 0))
+        ]
+        log.info(f"number of rows with nan sheets to be checked: {len(df_nan)}")
+        return df, df_nan
+
+    def faaaack_temp_fix_nans_in_sheet(self):
+        df, df_nan = self.first_phase_df()
+        self.__iter_trough_nans(df, df_nan)
+
     def get_all_player_names_per_game_and_store_them(self):
         log.info("fix all player names")
         clean_csv_info = CleanCsvInfo()
 
         df = sqlite_table_to_df(table_name=SQLITE_TABLE_NAMES_UNICODE)
-        log.info(f'nr rows before dropping duplicates: {str(len(df))}')
+        log.info(f"nr rows before dropping duplicates: {str(len(df))}")
         time.sleep(1)
-        df.drop_duplicates(keep='first', inplace=True)
-        log.info(f'nr rows after dropping duplicates: {str(len(df))}')
+        df.drop_duplicates(keep="first", inplace=True)
+        log.info(f"nr rows after dropping duplicates: {str(len(df))}")
         time.sleep(1)
         df_to_sqlite_table(
             df, table_name=SQLITE_TABLE_NAMES_UNICODE, if_exists="replace"
         )
 
-        import pandas as pd
-        nr_games = 0
-        for csv_type, csv_file_path in clean_csv_info.csv_info:
-            df = pd.read_csv(csv_file_path, sep="\t")
-            nr_games += len(df)
-        log.info(f'found in total {str(nr_games)} games ')
-        time.sleep(1)
+        # hier ff stoppen
 
-        for csv_type, csv_file_path in clean_csv_info.csv_info:
-            # first fix only the valid csvs
-            invalid_paths = []
-            if not 'invalid' in csv_file_path:
-                invalid_paths.append((csv_type, csv_file_path))
-                sheet_fixer = SheetFixer(csv_type, csv_file_path)
-                sheet_fixer.run()
-
-        # secondly, fix only the invalid csvs
-        for csv_type, csv_file_path in clean_csv_info.csv_info:
-            sheet_fixer = SheetFixer(csv_type, csv_file_path)
-            sheet_fixer.run()
-
+        # nr_games = 0
+        # for csv_type, csv_file_path in clean_csv_info.csv_info:
+        #     df = pd.read_csv(csv_file_path, sep="\t")
+        #     nr_games += len(df)
+        # log.info(f"found in total {str(nr_games)} games ")
+        # time.sleep(1)
+        #
+        # for csv_type, csv_file_path in clean_csv_info.csv_info:
+        #     # first fix only the valid csvs
+        #     invalid_paths = []
+        #     if not "invalid" in csv_file_path:
+        #         invalid_paths.append((csv_type, csv_file_path))
+        #         sheet_fixer = UnicodeScraperController(csv_type, csv_file_path)
+        #         sheet_fixer.run()
+        #
+        # # secondly, fix only the invalid csvs
+        # for csv_type, csv_file_path in clean_csv_info.csv_info:
+        #     sheet_fixer = UnicodeScraperController(csv_type, csv_file_path)
+        #     sheet_fixer.run()
 
     def enrich(self):
         log.info("enrich clean csv_data")
@@ -379,11 +468,16 @@ class ProcessController:
         self.check_valid_import_data_exists()  # raises when not exists
         self.empty_clean_dirs()  # empties dir when not empty
         self.copy_valid_import_to_clean()
-        self.clean()
 
-    def do_replace_all_players(self):
-        """Apparently I messed up scraping player names. Not unicode."""
+        ##### THIS IS TEMP #####
+        # loop through clean dir, scrape, and store in sqlite
         self.get_all_player_names_per_game_and_store_them()
+        self.faaaack_temp_fix_nans_in_sheet()
+
+        # update all csvs in clean dir and update managers and sheets
+        # self.replace_managers_sheets_in_clean_dir_csvs()
+        ##### THIS IS TEMP #####
+        # self.clean()
 
     def do_repair_invalid_clean(self):
         """repair all invalid csvs in folder 'clean' (as a result of 'do_clean()'"""
@@ -409,8 +503,7 @@ class ProcessController:
     def run(self):
         # self.do_scrape()  # scrap data (webpage --> raw)
         # self.do_import()  # import raw data (raw --> import)
-        # self.do_clean()  # clean data (import --> clean)
-        self.do_replace_all_players()
+        self.do_clean()  # clean data (import --> clean)
         # self.do_repair_invalid_clean()
         # self.do_merge()  # add 2 or 3 columns to clean and then merge to sqlite
         # self.determine_teams()
