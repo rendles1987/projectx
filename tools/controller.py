@@ -1,3 +1,4 @@
+import pandas as pd
 from tools.constants import (
     CLEAN_CSV_DIRS,
     IMPORT_CSV_DIRS,
@@ -6,7 +7,8 @@ from tools.constants import (
 )
 from tools.csv_cleaner.csv_cleaner import CupCsvCleaner
 from tools.csv_cleaner.csv_cleaner import LeagueCsvCleaner
-from tools.csv_cleaner.repair_invalid_cleaned import CupCsvRepair, LeagueCsvRepair
+
+# from tools.csv_cleaner.repair_invalid_cleaned import CupCsvRepair, LeagueCsvRepair
 from tools.csv_dir_info import CleanCsvInfo
 from tools.csv_dir_info import ImportCsvInfo
 from tools.csv_dir_info import RawCsvInfo
@@ -14,7 +16,6 @@ from tools.csv_importer.filename_checker import CupFilenameChecker
 from tools.csv_importer.filename_checker import LeagueFilenameChecker
 from tools.csv_importer.raw_csv_importer import check_nan_fix_required
 from tools.csv_importer.raw_csv_importer import CupCsvImporter
-from tools.csv_importer.raw_csv_importer import df_to_csv
 from tools.csv_importer.raw_csv_importer import fix_nan_values
 from tools.csv_importer.raw_csv_importer import get_df_fix_managers
 from tools.csv_importer.raw_csv_importer import get_df_fix_players
@@ -32,6 +33,7 @@ import numpy as np
 from tools.scraper.scrape_all_players import UnicodeScraper
 from tools.csv_cleaner.repair_invalid_cleaned import UpdateNamesGameCsv
 from tools.scraper.scrape_all_players import JumpToNextRow
+from tools.utils import drop_duplicates_in_csv
 
 import logging
 import os
@@ -52,8 +54,9 @@ def retrieve_name(var):
 def log_size_of_variable(my_var, my_var_string):
     my_var_name = my_var_string  # retrieve_name(my_var)
     my_var_size_b = getsizeof(my_var)
-    my_var_size_mb = getsizeof(my_var) / (1000*1000)
-    log.info(f'variable {my_var_name}: {my_var_size_mb} mbytes')
+    my_var_size_mb = getsizeof(my_var) / (1000 * 1000)
+    log.info(f"variable {my_var_name}: {my_var_size_mb} mbytes")
+
 
 class ProcessController:
     def __init__(self):
@@ -309,6 +312,7 @@ class ProcessController:
             scrape_count += 1
             scraper = UnicodeScraper(row["url"])
             if not scraper.can_read_html():
+                log.error(f"cannot read html {str(row['url'])}")
                 continue
             try:
                 if scraper.home_sheet is not np.nan:
@@ -322,7 +326,7 @@ class ProcessController:
                 continue
             # sum_nans = sum(df["checked_nan_sheets"])
             # log.info(f"sum check_nan_sheets: {str(sum_nans)}")
-            if scrape_count == 300:
+            if scrape_count == 5:
                 # df["checked_nan_sheets"][row_ids] = 1
                 self.rows_to_sqlite_and_start_next_phase(df)
 
@@ -364,41 +368,34 @@ class ProcessController:
         df, df_nan = self.first_phase_df()
         self.__iter_trough_nans(df, df_nan)
 
-    def get_all_player_names_per_game_and_store_them(self):
-        log.info("fix all player names")
+    @staticmethod
+    def remove_duplicate_rows_all_clean_csv():
         clean_csv_info = CleanCsvInfo()
+        for csv_type, csv_file_path in clean_csv_info.csv_info:
+            drop_duplicates_in_csv(csv_file_path, keep="first")
+
+    @staticmethod
+    def get_all_player_names_per_game_and_store_them():
+        log.info("fix all player names")
 
         df = sqlite_table_to_df(table_name=SQLITE_TABLE_NAMES_UNICODE)
         log.info(f"nr rows before dropping duplicates: {str(len(df))}")
         time.sleep(1)
-        df.drop_duplicates(keep="first", inplace=True)
+        # games are unique by combination of these columns
+        unique_column_set = ["date", "home", "away"]
+        df.drop_duplicates(subset=unique_column_set, keep="first", inplace=True)
         log.info(f"nr rows after dropping duplicates: {str(len(df))}")
         time.sleep(1)
         df_to_sqlite_table(
             df, table_name=SQLITE_TABLE_NAMES_UNICODE, if_exists="replace"
         )
 
-        # hier ff stoppen
+        from tools.scraper.scrape_all_players import UnicodeScraperController
 
-        # nr_games = 0
-        # for csv_type, csv_file_path in clean_csv_info.csv_info:
-        #     df = pd.read_csv(csv_file_path, sep="\t")
-        #     nr_games += len(df)
-        # log.info(f"found in total {str(nr_games)} games ")
-        # time.sleep(1)
-        #
-        # for csv_type, csv_file_path in clean_csv_info.csv_info:
-        #     # first fix only the valid csvs
-        #     invalid_paths = []
-        #     if not "invalid" in csv_file_path:
-        #         invalid_paths.append((csv_type, csv_file_path))
-        #         sheet_fixer = UnicodeScraperController(csv_type, csv_file_path)
-        #         sheet_fixer.run()
-        #
-        # # secondly, fix only the invalid csvs
-        # for csv_type, csv_file_path in clean_csv_info.csv_info:
-        #     sheet_fixer = UnicodeScraperController(csv_type, csv_file_path)
-        #     sheet_fixer.run()
+        clean_csv_info = CleanCsvInfo()
+        for csv_type, csv_file_path in clean_csv_info.csv_info:
+            sheet_fixer = UnicodeScraperController(csv_type, csv_file_path)
+            sheet_fixer.run()
 
     def enrich(self):
         log.info("enrich clean csv_data")
@@ -463,19 +460,108 @@ class ProcessController:
         self.remove_tab_strings_from_df()  # noqa replace strings like '\t' with '', overwrites existing raw_csv
         self.convert_csv_data()
 
-    def do_clean(self):
-        self.check_dirs_exist(self.import_dirs, self.clean_dirs)  # raise if not exists
-        self.check_valid_import_data_exists()  # raises when not exists
-        self.empty_clean_dirs()  # empties dir when not empty
-        self.copy_valid_import_to_clean()
+    def add_manual_repaired_to_valid(self):
+        """ import dir has been filled with _invalid and _valid.
+        I checked manually each game in a _invalid.csv and fixed them in _repaired.csv
+        Now, lets add rows in _repaired to _valid.csv
+        Next step is copy _valid from import to clean dir
+        """
+        import os
+        import pandas as pd
+        from tools.constants import MANUAL_FIX_INVALID_IMPORT_DIR as manual_dir
+        from tools.utils import df_to_csv
 
-        ##### THIS IS TEMP #####
+        assert os.path.isdir(manual_dir)
+        # [(filepath, filename), (filepath, filename), etc]
+        repaired_csv_paths = [
+            file.rsplit("_repaired.csv")[0]
+            for file in os.listdir(manual_dir)
+            if file.endswith("_repaired.csv")
+        ]
+
+        # find matching _valid (if match, add rows to that _valid.csv)
+        import_csv_info = ImportCsvInfo()
+        for csv_type, valid_csv_file_path in import_csv_info.get_valid_csv():
+            file_name = valid_csv_file_path.rsplit("/")[-1].rsplit("_valid.csv")[0]
+            if file_name in repaired_csv_paths:
+                index = repaired_csv_paths.index(file_name)
+                repaired_csv_paths.pop(index)
+                repaired_full_path = (
+                    os.path.join(manual_dir, file_name) + "_repaired.csv"
+                )
+                df_repaired = pd.read_csv(repaired_full_path, sep="\t")
+                df_valid = pd.read_csv(valid_csv_file_path, sep="\t")
+
+                default_col = [
+                    "date",
+                    "home",
+                    "away",
+                    "score",
+                    "home_goals",
+                    "away_goals",
+                    "url",
+                    "home_manager",
+                    "away_manager",
+                    "home_sheet",
+                    "away_sheet",
+                ]
+                if csv_type == "league":
+                    desired_col = default_col
+                elif csv_type == "cup":
+                    desired_col = default_col
+                    desired_col.extend(
+                        [
+                            "round_text",
+                            "play_round",
+                            "score_45",
+                            "score_90",
+                            "score_105",
+                            "score_120",
+                            "aet",
+                            "pso",
+                        ]
+                    )
+                else:
+                    raise
+                df_repaired_select_col = df_repaired[desired_col]
+
+                len_before_append = len(df_valid)
+                df_valid = df_valid.append(df_repaired_select_col)
+                len_after_append = len(df_valid)
+                if len_before_append != len_after_append:
+                    diff = len_after_append - len_before_append
+                    log.info(f"appended {diff} rows")
+
+                len_before_drop = len(df_valid)
+                df_valid.drop_duplicates()
+                len_after_drop = len(df_valid)
+                if len_before_drop != len_after_drop:
+                    diff = len_before_drop - len_after_drop
+                    log.info(f"dropped {diff} rows")
+                df_to_csv(df_valid, valid_csv_file_path)  # overwriting file
+        assert len(repaired_csv_paths) == 0
+        # TODO: maybe there was no _valid created (since no rows were valid). An
+        #  _invalid should exist. If not raise, if so then create an _valid.
+
+    def do_clean(self):
+        # self.check_dirs_exist(self.import_dirs, self.clean_dirs)  # raise if not exists
+        # self.check_valid_import_data_exists()  # raises when not exists
+        # self.empty_clean_dirs()  # empties dir when not empty
+
+        # this is tmp stuff
+        # self.add_manual_repaired_to_valid()
+
+        # not tmp
+        # self.copy_valid_import_to_clean()
+
+        # this is tmp stuff
         # loop through clean dir, scrape, and store in sqlite
+        # self.remove_duplicate_rows_all_clean_csv()
         self.get_all_player_names_per_game_and_store_them()
-        self.faaaack_temp_fix_nans_in_sheet()
+        # self.faaaack_temp_fix_nans_in_sheet()
 
         # update all csvs in clean dir and update managers and sheets
-        # self.replace_managers_sheets_in_clean_dir_csvs()
+        self.replace_managers_sheets_in_clean_dir_csvs()
         ##### THIS IS TEMP #####
         # self.clean()
 

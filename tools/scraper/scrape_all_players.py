@@ -1,3 +1,4 @@
+import requests
 import pandas as pd
 import time
 import string
@@ -7,7 +8,7 @@ from tools.constants import TAB_DELIMETER, SQLITE_TABLE_NAMES_UNICODE
 import logging
 import numpy as np
 from tools.utils import df_to_sqlite_table, sqlite_table_to_df
-
+import requests
 
 log = logging.getLogger(__name__)
 
@@ -78,7 +79,7 @@ class UnicodeScraperController:
             "home_sheet",
             "away_sheet",
         ]
-        df = pd.DataFrame().reindex_like(self.dataframe[columns])
+        empty_df = pd.DataFrame().reindex_like(self.dataframe[columns])
         # set these column to dtype str and empty them
         columns = [
             "home_manager",
@@ -90,45 +91,89 @@ class UnicodeScraperController:
             "away_subs",
         ]
         for col in columns:
-            df[col] = df["home_manager"].astype(str)
-            df[col] = np.NaN
-        return df
+            empty_df[col] = empty_df["home_manager"].astype(str)
+            empty_df[col] = np.NaN
+        return empty_df
 
     def run(self):
 
+        df_unicodes = sqlite_table_to_df(table_name=SQLITE_TABLE_NAMES_UNICODE)
+        match_columns = ["date", "home", "away"]
+
+        # check how many rows are missing METHOD 1
+        suffixes = ("_orig", "_new")
+        df_merge = pd.merge(
+            self.dataframe,
+            df_unicodes,
+            how="inner",
+            on=match_columns,
+            suffixes=suffixes,
+        )
+        df_merge.drop_duplicates(keep="first", inplace=True)
+        # check if all rows are in sqlite (df_unicodes)
+        if len(df_merge) == len(self.dataframe):
+            return
+        nr_missing_rows = len(self.dataframe) - len(df_merge)
+
+        # check how many rows are missing METHOD 2
+        df_rows_not_in_sqlite = self.dataframe.merge(
+            df_unicodes, on=match_columns, how="left", indicator=True
+        )
+        df_rows_not_in_sqlite.drop_duplicates(keep="first", inplace=True)
+        df_rows_not_in_sqlite = df_rows_not_in_sqlite[
+            df_rows_not_in_sqlite["_merge"] == "left_only"
+        ]
+
+        # compare method1 with method2
+        assert len(df_rows_not_in_sqlite) == nr_missing_rows
+
         try:
-            for index, row in self.dataframe.iterrows():
-                if self.row_already_in_sqlite(row):
-                    # log.info(f"this row is already in sqlite {row.url}")
-                    continue
+            for index, row in df_rows_not_in_sqlite.iterrows():
+
+                set_index = 0
+
+                # get same row in self.dataframe
+                df_row = self.dataframe[
+                    (self.dataframe["date"] == row["date"])
+                    & (self.dataframe["home"] == row["home"])
+                    & (self.dataframe["away"] == row["away"])
+                ]
+                assert len(df_row) == 1
+                assert not self.row_already_in_sqlite(row)
+
                 df = self.create_empty_df()
-                df["date"][index] = row["date"]
-                df["home"][index] = row["home"]
-                df["away"][index] = row["away"]
-                df["url"][index] = row["url"]
-                df["game_type"][index] = row["game_type"]
-                df["game_name"][index] = row["game_name"]
-                df["country"][index] = row["country"]
-                df["source_file"][index] = row["source_file"]
-                if str(row["url"]) == "nan":
-                    df["home_manager"][index] = np.nan
-                    df["away_manager"][index] = np.nan
-                    df["home_sheet"][index] = np.nan
-                    df["away_sheet"][index] = np.nan
-                    df["home_subs"][index] = np.nan
-                    df["away_subs"][index] = np.nan
-                    df["start_time"][index] = np.nan
+                df["date"][0] = df_row["date"].values
+                df["home"][0] = df_row["home"].values
+                df["away"][0] = df_row["away"].values
+                df["url"][0] = df_row["url"].values
+                df["game_type"][0] = df_row["game_type"].values
+                df["game_name"][0] = df_row["game_name"].values
+                df["country"][0] = df_row["country"].values
+                df["source_file"][0] = df_row["source_file"].values
+                if str(df_row["url"]) == "nan" or any(df_row["url"].isna()):
+                    df["home_manager"][0] = np.nan
+                    df["away_manager"][0] = np.nan
+                    df["home_sheet"][0] = np.nan
+                    df["away_sheet"][0] = np.nan
+                    df["home_subs"][0] = np.nan
+                    df["away_subs"][0] = np.nan
+                    df["start_time"][0] = np.nan
                 else:
-                    scraper = UnicodeScraper(row["url"])
+                    complete_url = df_row["url"].values[0]
+                    scraper = UnicodeScraper(complete_url)
                     if not scraper.can_read_html():
+                        log.critical(f'{self.csv_file_name_without_extension} cannot '
+                                     f'read {complete_url}')
                         continue
-                    df["home_manager"][index] = scraper.home_manager
-                    df["away_manager"][index] = scraper.away_manager
-                    df["home_sheet"][index] = scraper.home_sheet
-                    df["away_sheet"][index] = scraper.away_sheet
-                    df["home_subs"][index] = scraper.home_subs
-                    df["away_subs"][index] = scraper.away_subs
-                    df["start_time"][index] = scraper.start_time
+                    if scraper.gets_a_redirect():
+                        continue
+                    df["home_manager"][0] = scraper.home_manager
+                    df["away_manager"][0] = scraper.away_manager
+                    df["home_sheet"][0] = scraper.home_sheet
+                    df["away_sheet"][0] = scraper.away_sheet
+                    df["home_subs"][0] = scraper.home_subs
+                    df["away_subs"][0] = scraper.away_subs
+                    df["start_time"][0] = scraper.start_time
 
                 # Drop rows if all empty cells
                 df.dropna(axis=0, how="all", thresh=None, subset=None, inplace=True)
@@ -138,6 +183,8 @@ class UnicodeScraperController:
                     df_to_sqlite_table(
                         df, table_name=SQLITE_TABLE_NAMES_UNICODE, if_exists="append"
                     )
+        except Exception as e:
+            print(e)
         except JumpToNextRow:
             log.error(f"skipped row {index} of {self.csv_file_full_path}")
 
@@ -158,6 +205,13 @@ class UnicodeScraper:
         self._away_sheet = None
         self._away_subs = None
         self._start_time = None
+
+    def gets_a_redirect(self):
+        request = requests.get(self.url, allow_redirects=True)
+        if request.url == 'https://www.worldfootball.net/':
+            log.critical(f'{self.url} results in "www.worldfootball.net/"')
+            return True
+        return False
 
     def can_read_html(self):
         try:
@@ -362,7 +416,7 @@ class UnicodeScraper:
         for player in list_with_subs:
             # https://www.worldfootball.net/report/segunda-division-2017-2018-fc-barcelona-b-gimnastic/
             # in between Perez en Varo str(player) is 'nan' ...
-            if str(player) == 'nan':
+            if str(player) == "nan":
                 continue
             stripped_player = player.strip()
             if stripped_player.lower() in ["substitutes", "substitute"]:

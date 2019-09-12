@@ -14,7 +14,9 @@ SQLITE_TABLE_NAMES_UNICODE = (
 )  # contains for all games the standard details + start_time, and names of managers, starters and subs (unicode)  noqa
 
 
-use_temp = True
+MANUAL_FIX_INVALID_IMPORT_DIR = "/work/data/invalid_import_manual_fix"
+
+use_temp = False
 if use_temp:
     RAW_CSV_DIRS = {
         "cup": "/work/data/temp_stuff/_01_raw/cup",

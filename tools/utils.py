@@ -58,6 +58,18 @@ def ensure_corect_date_format(df):
     return df
 
 
+def drop_duplicates_in_csv(csv_full_path, keep=None):
+    assert keep in ("first", "last", False)
+    df = pd.read_csv(csv_full_path, sep="\t")
+    nr_rows_before_drop = len(df)
+    df.drop_duplicates(keep=keep, inplace=True)
+    nr_rows_after_drop = len(df)
+    diff = nr_rows_before_drop - nr_rows_after_drop
+    if diff > 0:
+        log.info(f"{csv_full_path} dropped {diff} rows")
+        df_to_csv(df, csv_full_path)
+
+
 def df_to_csv(df, csv_path):
     """convert panda dataframe to csv
     By default the following values are interpreted as NaN:
